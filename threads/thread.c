@@ -104,7 +104,16 @@ void thread_sleep(int64_t ticks) {
 
   thread_set_wakeup_ticks(curr_t, ticks);     /* ticks 설정 */
   list_push_back(&sleep_list, &curr_t->elem); /* sleep_list에 넣어준다*/
-  thread_block(); /* 쓰레드를 BLOCKED 상태로 변경 */
+
+  /* Project.1 alarm clock solution 1 */
+  // thread_block();
+  /*
+    Project.1 alarm clock solution 2
+    thread_block() 안에서도 schedule()이 호출되기에 차이는 크지않다.
+    허나 do_schedule()을 호출시에 내부적으로 destruction_req를 처리하기에
+    do_schedule()을 호출하는 것이 메모리관점에서 효율적이라 생각한다.
+  */
+  do_schedule(THREAD_BLOCKED);
 
   intr_set_level(old_level); /* restore interrupt */
 }
@@ -244,11 +253,17 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
 
   ASSERT(function != NULL);
 
-  /* Allocate thread. */
+  /*
+    Allocate thread.
+    thread 구조체를 위한 메모리 할당
+  */
   t = palloc_get_page(PAL_ZERO);
   if (t == NULL) return TID_ERROR;
 
-  /* Initialize thread. */
+  /*
+    Initialize thread.
+    아래에서 unblock 하는 이유는 init_thread에서 BLOCKED으로 초기화
+  */
   init_thread(t, name, priority);
   tid = t->tid = allocate_tid();
 
@@ -556,13 +571,27 @@ static void thread_launch(struct thread *th) {
       : "memory");
 }
 
-/* Schedules a new process. At entry, interrupts must be off.
- * This function modify current thread's status to status and then
- * finds another thread to run and switches to it.
- * It's not safe to call printf() in the schedule(). */
+/**
+ * @brief 현재 돌고있는 Running thread를 status로 변경하고 다음 thread를 찾아
+ *        실행한다.
+ *
+ * @param status 현재 Running thread의 status를 변경하고자하는 state
+ *
+ * @note Schedules a new process. At entry, interrupts must be off.
+ *       This function modify current thread's status to status and then
+ *       finds another thread to run and switches to it.
+ *       It's not safe to call printf() in the schedule().
+ */
 static void do_schedule(int status) {
+  /* 예외처리 */
   ASSERT(intr_get_level() == INTR_OFF);
   ASSERT(thread_current()->status == THREAD_RUNNING);
+
+  /*
+    Destroy the current thread if it is dying
+    destruction_req에 담길때는 schedule()이 호출될때 schedule 내부에서
+    죽은 상태의 쓰레드들을 destruction_req에 넣어둔다.
+  */
   while (!list_empty(&destruction_req)) {
     struct thread *victim =
         list_entry(list_pop_front(&destruction_req), struct thread, elem);
