@@ -132,7 +132,6 @@ void thread_check_awake(int64_t ticks);
 bool priority_ascending_sort(const struct list_elem *a,
                              const struct list_elem *b, void *aux);
 void preempt_schedule(void);
-void donate_priority(void);
 void print_priority(struct list *list);
 /* ------------------------------------------- */
 
