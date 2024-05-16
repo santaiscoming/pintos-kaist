@@ -72,6 +72,9 @@ static void donate_priority(void) {
 
     curr_t = curr_t->wait_on_lock->holder;
 
+    /* TODO
+			 정렬된 순서대로 들어가기에 비교를 할 필요가 없다는데
+			 아무리봐도 아닌거같은데 생각해보자... */
     if (curr_t->priority < prev_priority) {
       curr_t->priority = prev_priority;
       prev_priority = curr_t->priority;
@@ -194,6 +197,7 @@ void sema_down(struct semaphore *sema) {
     list_insert_ordered(&sema->waiters, &thread_current()->elem,
                         (list_less_func *)&priority_ascending_sort, NULL);
     thread_block();
+    /* ------------------------------------- */
   }
 
   preempt_schedule();

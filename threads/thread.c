@@ -536,6 +536,8 @@ int thread_get_priority(void) { return thread_current()->priority; }
  * @param nice 설정할 nice 값
 */
 void thread_set_nice(int nice) {
+  ASSERT(nice >= NICE_MIN && nice <= NICE_MAX);
+
   enum intr_level old_level;
 
   old_level = intr_disable(); /* interrupt off */
@@ -630,16 +632,24 @@ static void init_thread(struct thread *t, const char *name, int priority) {
   t->status = THREAD_BLOCKED;
   strlcpy(t->name, name, sizeof t->name);
   t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
-  t->priority = priority;
+  /* ------------ before Project.1-3 ------------
+     t->priority = priority; */
   t->magic = THREAD_MAGIC;
 
-  /* ----------- added for Project.1 ----------- */
-  t->wakeup_ticks = 0;
+  /* ----------- added for Project.1-1 ----------- */
+  t->wakeup_ticks = WAKEUP_TICKS_DEFAULT;
 
-  /* ----------- added for Project.2 ----------- */
+  /* ----------- added for Project.1-2 ----------- */
   t->initial_priority = priority;
   t->wait_on_lock = NULL;
   list_init(&t->donations);
+
+  /* ----------- added for Project.1-3 ----------- */
+  t->priority = thread_mlfqs ? PRI_DEFAULT : priority;
+  t->nice = NICE_DEFAULT;
+  t->recent_cpu = RECENT_CPU_DEFAULT;
+
+  /* ------------------------------------------- */
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

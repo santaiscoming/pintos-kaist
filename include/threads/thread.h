@@ -27,10 +27,17 @@ typedef int tid_t;
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63     /* Highest priority. */
 
+/* ------------ added for Project.1-1 ------------ */
+
+#define WAKEUP_TICKS_DEFAULT 0
+
 /* ------------ added for Project.1-3 ------------ */
+
 #define NICE_MIN -20
 #define NICE_DEFAULT 0
 #define NICE_MAX 20
+
+#define RECENT_CPU_DEFAULT 0
 
 /* 
   format : 17.14 fixed-point
@@ -138,7 +145,13 @@ struct thread {
   struct list_elem donation_elem; /* struct donations list를 위한 elem */
 
   /* ----------- added for project.1-2 ----------- */
-  int nice; /* for mlfqs */
+  /* CPU사용을 얼마나 양보했는가를 표현하는 정수
+     nice lower : decrease priority
+     nice higher : increase priority
+     즉, 양보를 많이했다는 것은 우선순위가 낮다는 얘기다.
+  */
+  int nice;
+  int recent_cpu;
 
   /* --------------------------------------------- */
 
@@ -164,15 +177,14 @@ void thread_set_wakeup_ticks(struct thread *t, int64_t ticks);
 void thread_sleep(int64_t ticks);
 void thread_check_awake(int64_t ticks);
 
-/* ------------------------------------------- */
-
 /* ----------- added for Project.1-2 ----------- */
 
 bool priority_ascending_sort(const struct list_elem *a,
                              const struct list_elem *b, void *aux);
 void preempt_schedule(void);
 void print_priority(struct list *list);
-/* ------------------------------------------- */
+
+/* -------------------------------------------- */
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
