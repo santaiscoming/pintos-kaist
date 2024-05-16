@@ -27,6 +27,41 @@ typedef int tid_t;
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63     /* Highest priority. */
 
+/* ------------ added for Project.1-3 ------------ */
+#define NICE_MIN -20
+#define NICE_DEFAULT 0
+#define NICE_MAX 20
+
+/* 
+  format : 17.14 fixed-point
+  n : integer
+  F : 1 << 14
+  x : Fixed-Point
+  y : Fixed-Point
+*/
+#define F 16384
+
+/* fixed_point(고정 소수점) 산술 macro */
+
+#define CONVERT_TO_FP(n) (n * F)
+#define CONVERT_TO_INT_ZERO(x) (x / F)
+#define CONVERT_TO_INT_NEAREST(x) \
+  (x >= 0 ? ((x + F / 2) / F) : ((x - F / 2) / F))
+
+#define ADD_FP(x, y) (x + y)
+#define SUB_FP(x, y) (x - y)
+
+#define ADD_INT_AND_FP(x, n) (x + (n * F))
+#define SUB_INT_AND_FP(x, n) (x - (n * F))
+
+#define MUL_FP(x, y) (((int64_t)x) * y / F)
+#define MUL_INT_AND_FP(x, n) (x * n)
+
+#define DIV_FP(x, y) (((int64_t)x) * F / y)
+#define DIV_INT_AND_FP(x, n) (x / n)
+
+/* ----------------------------------------------- */
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -103,7 +138,6 @@ struct thread {
   struct list_elem donation_elem; /* struct donations list를 위한 elem */
 
   /* ----------- added for project.1-2 ----------- */
-
   int nice; /* for mlfqs */
 
   /* --------------------------------------------- */
