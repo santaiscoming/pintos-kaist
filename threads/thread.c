@@ -530,15 +530,36 @@ void thread_set_priority(int new_priority) {
 /* Returns the current thread's priority. */
 int thread_get_priority(void) { return thread_current()->priority; }
 
-/* Sets the current thread's nice value to NICE. */
-void thread_set_nice(int nice UNUSED) {
-  /* TODO: Your implementation goes here */
+/**
+ * @brief Running(current) thread의 nice 멤버변수를 설정한다.
+ * 
+ * @param nice 설정할 nice 값
+*/
+void thread_set_nice(int nice) {
+  enum intr_level old_level;
+
+  old_level = intr_disable(); /* interrupt off */
+
+  thread_current()->nice = nice;
+
+  intr_set_level(old_level); /* restore interrupt */
 }
 
-/* Returns the current thread's nice value. */
+/**
+ * @brief Running(current) thread의 nice 멤버변수를 반환한다.
+ * 
+ * @return struct thread nice
+*/
 int thread_get_nice(void) {
-  /* TODO: Your implementation goes here */
-  return 0;
+  enum intr_level old_level;
+
+  old_level = intr_disable(); /* interrupt off */
+
+  int nice = thread_current()->nice;
+
+  intr_set_level(old_level); /* restore interrupt */
+
+  return nice;
 }
 
 /* Returns 100 times the system load average. */

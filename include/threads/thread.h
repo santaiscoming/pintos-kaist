@@ -101,6 +101,11 @@ struct thread {
   struct lock *wait_on_lock; /* 현재 쓰레드가 대기중인 lock */
   struct list donations;     /* priority를 상속해준 기부자(thread) */
   struct list_elem donation_elem; /* struct donations list를 위한 elem */
+
+  /* ----------- added for project.1-2 ----------- */
+
+  int nice; /* for mlfqs */
+
   /* --------------------------------------------- */
 
 #ifdef USERPROG
