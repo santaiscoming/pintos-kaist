@@ -323,7 +323,7 @@ void thread_print_stats(void) {
          반대로, 원본 스레드는 새로운 스레드가 스케줄링되기 전에 임의의 시간 동안
          실행될 수 있다. 순서가 필요한 경우 세마포어 또는 다른 형태의 동기화를 사용하십시오.]
 
-         -> 즉, 비동기적이다. 
+         -> 즉, 비동기적일 수 있다. 
 
          The code provided sets the new thread's `priority' member to
          PRIORITY, but no actual priority scheduling is implemented.
@@ -366,7 +366,9 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
   /* ----------- added for Project.1-2 Priority Scheduling -----------
     new_thread가 ready_list에 들어가게되는데 arg로 받은 new_thread보다
     running_thread가 우선순위가 높다면 ruuning_thread를 양보한다. */
+
   if (thread_get_priority() < priority) thread_yield();
+
   /* --------------------------------------------------------------- */
 
   return tid;
@@ -392,7 +394,33 @@ void thread_block(void) {
    This function does not preempt the running thread.  This can
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
-   update other data. */
+   update other data.
+   
+
+
+    */
+/**
+ * @brief "BLOCKED" 상태의 current thread를 "READY" 상태로 전환하고 
+ *        ready_list에 넣는다.
+ * 
+ * @param t "BLOCKED" 상태의 thread
+ * 
+ * @note Transitions a blocked thread T to the ready-to-run state.
+         This is an error if T is not blocked. (Use thread_yield() to
+         make the running thread ready.)
+
+         차단된 스레드 T를 실행 준비 상태로 전환합니다. T가 차단되지 않으면 오류입니다.
+         (thread_yield()를 사용하여 실행 중인 스레드를 준비하십시오.)
+
+         This function does not preempt the running thread.  This can
+         be important: if the caller had disabled interrupts itself,
+         it may expect that it can atomically unblock a thread and
+         update other data.
+
+         이 기능은 실행 중인 스레드를 선점하는 것이 아니다. 이것은 중요할 수 있다: 발신자가
+         인터럽트 자체를 비활성화했다면, 스레드의 차단을 원자적으로 해제하고 다른 데이터를
+         업데이트할 수 있을 것으로 예상할 수 있다.
+*/
 void thread_unblock(struct thread *t) {
   enum intr_level old_level;
 
