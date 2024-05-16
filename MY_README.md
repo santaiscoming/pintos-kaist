@@ -133,11 +133,41 @@ struct lock {
 #### function
 
 - calc
+
   - [ ] `calc_priority()` using `calc_recent_cpu()`, `calc_nice()`
   - [ ] `calc_recent_cpu()`
   - [ ] `load_avg()`
   - [ ] `increase_recent_cpu()` 1씩 증가
   - [ ] 모든 쓰레드에 대해 `re_calc_priority()`, `re_calc_recent_cpu()`
+
+- getter
+
+  - [ ] `thread_get_recnet_cpu()`
+  - [ ] `thread_get_load_avg()`
+  - [x] `thread_get_nice()`
+
+- setter
+
+  - [x] `thread_set_nice()`
+
+- modify
+
+  - [ ] `lock_acquire()`
+
+    - forbid **donate priority**
+
+  - [ ] `lock_release()`
+
+    - forbid **donate priority**
+
+  - [ ] `thread_set_priority()`
+
+    - [ ] disable **Advanced scheduler**
+
+  - [ ] `timer_interrupt()`
+
+    - **EVERY 1 SEC ALL THREAD** re-calculate `recent_cpu` and `priority`
+    - **EVERY 4 TICKS** re-calculate `load_avg`
 
 # 🤔 의문점
 
