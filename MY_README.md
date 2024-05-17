@@ -116,9 +116,43 @@ struct lock {
 
 ## 📝 BSD
 
-### nice
+### 👉 nice
 
-### To-do
+-> thread가 cpu를 얼마나 양보했는가를 나타낸다.
+
+- `nice`가 높을수록 cpu를 많이 양보한것이다.
+  - 다시말해, priority가 낮아진다.👇
+- `nice`가 낮을수록 cpu를 적게 양보한것이다.
+  - 다시말해, priority가 높아진다.👆
+
+### 👉 recent_cpu
+
+-> 각 thread의 cpu 사용시간을 반영한다.
+
+### 👉 load_avg
+
+-> cpu의 부하를 나타낸다.
+
+### 👉 decay
+
+-> 감쇄계수를 의미한다.
+
+recent_cpu는 시간이 지남에 따라 감쇄되어야 하는데 thread가 cpu를 사용안했다고 해서 급격하게 recent_cpu가 감쇄하면 안되기에 감쇄계수를 사용한다.
+
+### Types
+
+- **integer**
+
+  - priority
+  - nice
+  - ready_thread_cnt
+
+- **Fixed-point**
+
+  - recent_cpu
+  - load_avg
+
+### ✅ To-do
 
 #### props
 
@@ -132,18 +166,25 @@ struct lock {
 
 #### function
 
+- 기본제공함수
+
+  - `void thread_set_nice(int nice)`
+  - `int thread_get_nice(void)`
+  - `int thread_get_load_avg(void)`
+  - `int thread_get_recent_cpu(void)`
+
 - calc
 
-  - [ ] `calc_priority()` using `calc_recent_cpu()`, `calc_nice()`
-  - [ ] `calc_recent_cpu()`
-  - [ ] `load_avg()`
-  - [ ] `increase_recent_cpu()` 1씩 증가
-  - [ ] 모든 쓰레드에 대해 `re_calc_priority()`, `re_calc_recent_cpu()`
+  - [x] `calc_priority()` using `calc_recent_cpu()`, `calc_nice()`
+  - [x] `calc_recent_cpu()`
+  - [x] `load_avg()`
+  - [x] `increase_recent_cpu()` 1씩 증가
+  - [x] 모든 쓰레드에 대해 `re_calc_priority()`, `re_calc_recent_cpu()`
 
 - getter
 
-  - [ ] `thread_get_recnet_cpu()`
-  - [ ] `thread_get_load_avg()`
+  - [x] `thread_get_recnet_cpu()`
+  - [x] `thread_get_load_avg()`
   - [x] `thread_get_nice()`
 
 - setter
@@ -152,22 +193,22 @@ struct lock {
 
 - modify
 
-  - [ ] `lock_acquire()`
+  - [x] `lock_acquire()`
 
     - forbid **donate priority**
 
-  - [ ] `lock_release()`
+  - [x] `lock_release()`
 
     - forbid **donate priority**
 
-  - [ ] `thread_set_priority()`
+  - [x] `thread_set_priority()`
 
-    - [ ] disable **Advanced scheduler**
+    - disable **Advanced scheduler**
 
-  - [ ] `timer_interrupt()`
-
-    - **EVERY 1 SEC ALL THREAD** re-calculate `recent_cpu` and `priority`
-    - **EVERY 4 TICKS** re-calculate `load_avg`
+  - [x] `timer_interrupt()`
+    - EACH **1 ticks (RUNNING THREAD)** increase `recent_cpu` by **1**
+    - EACH **1 SEC (ALL THREAD)** re-calculate `recent_cpu` and `priority`
+    - EACH **4 TICKS (Global Var)** re-calculate `load_avg`
 
 # 🤔 의문점
 
@@ -218,3 +259,44 @@ void sema_down(struct semaphore *sema) {
 ```
 
 block으로 컨텍스트가 스위칭되고 unblock 되었을때 다시 while문을 확인하고 value가 0이 아니면 sema를 -- 하고 lock을 취득한다.
+
+## thread_awake
+
+```c
+void thread_check_awake(int64_t ticks) {
+  struct list_elem *curr_ll_e;
+  struct thread *curr_t;
+
+  curr_ll_e = list_begin(&sleep_list);
+
+  while (1) {
+    if (curr_ll_e == list_end(&sleep_list)) break;
+
+    curr_t = list_entry(curr_ll_e, struct thread, elem);
+
+    if (curr_t->wakeup_ticks <= ticks) {
+      curr_ll_e = list_remove(curr_ll_e);
+      thread_unblock(curr_t);
+      continue;
+    }
+
+    curr_ll_e = list_next(curr_ll_e);
+  }
+}
+```
+
+list_remove와 `thread_unblock`의 순서를 변경하면 에러가 발생한다
+
+이유가 무엇일까 ?
+
+### nice
+
+nice를 변경했을때는 스케쥴링을 다시하지만 recent_cpu가 변경됐을떄에는 스케쥴링을 다시하지 않는 이유는
+
+recent_cpu는 모든 쓰레드에대해 똑같은 값이 선형적으로 증가할 뿐더러 특정 값에 수렴하기에
+
+recent_cpu는 스케쥴링에 변하지않는다
+
+단, nice라는 값은 얼마나 양보해야하는지 설정하는 값 즉, priority를 결정하는 값이기에 스케쥴링을 다시한다.
+
+허나 prioirty를 4tick마다 변경하기에 nice를 업데이트하자마자 스케쥴링을 다시하는것은 비효율적이 아닐까싶다.
