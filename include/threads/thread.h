@@ -33,6 +33,10 @@ typedef int tid_t;
 
 /* ------------ added for Project.1-3 ------------ */
 
+extern int load_avg;
+
+#define LOAD_AVG_DEFAULT 0
+
 #define NICE_MIN -20
 #define NICE_DEFAULT 0
 #define NICE_MAX 20
@@ -48,24 +52,40 @@ typedef int tid_t;
 */
 #define F 16384
 
-/* fixed_point(고정 소수점) 산술 macro */
+/* ------- fixed_point(고정 소수점) 산술 macro ------- */
 
-#define CONVERT_TO_FP(n) (n * F)
-#define CONVERT_TO_INT_ZERO(x) (x / F)
-#define CONVERT_TO_INT_NEAREST(x) \
-  (x >= 0 ? ((x + F / 2) / F) : ((x - F / 2) / F))
+/**
+ * @brief 정수를 fixed-point로 변환
+*/
+#define INT_TO_FP(n) (n * F)
+
+/**
+ * @brief fixed-point의 소수점을 버리고 정수로 변환
+ * 
+ * @note ZERO 라고 부르는 이유는 0의 방향으로 반올림하기 때문이다.
+ *       ex) 2.9 -> 2, -2.9 -> -2
+*/
+#define FP_TO_INT_ZERO(x) (x / F)
+
+/**
+ * @brief fixed-point의 소수점을 반올림하여 정수로 변환
+ * 
+ * @note NEAREST 라고 부르는 이유는 가장 가까운 정수로 올리기 때문이다.
+ *       ex) 2.7 -> 3, -2.7 -> -3
+*/
+#define FP_TO_INT_NEAREST(x) (x >= 0 ? ((x + F / 2) / F) : ((x - F / 2) / F))
 
 #define ADD_FP(x, y) (x + y)
 #define SUB_FP(x, y) (x - y)
 
-#define ADD_INT_AND_FP(x, n) (x + (n * F))
-#define SUB_INT_AND_FP(x, n) (x - (n * F))
+#define ADD_FP_AND_INT(x, n) (x + (n * F))
+#define SUB_FP_AND_INT(x, n) (x - (n * F))
 
 #define MUL_FP(x, y) (((int64_t)x) * y / F)
-#define MUL_INT_AND_FP(x, n) (x * n)
+#define MUL_FP_AND_INT(x, n) (x * n)
 
 #define DIV_FP(x, y) (((int64_t)x) * F / y)
-#define DIV_INT_AND_FP(x, n) (x / n)
+#define DIV_FP_AND_INT(x, n) (x / n)
 
 /* ----------------------------------------------- */
 
@@ -136,22 +156,32 @@ struct thread {
   struct list_elem elem; /* List element. */
 
   /* ----------- added for project.1-1 ----------- */
-  int64_t wakeup_ticks;
+
+  int64_t wakeup_ticks; /* sleep 상태에서 깨어날 시간 */
 
   /* ----------- added for project.1-2 ----------- */
+
   unsigned initial_priority; /* 상속 받기전 origin_priority */
   struct lock *wait_on_lock; /* 현재 쓰레드가 대기중인 lock */
   struct list donations;     /* priority를 상속해준 기부자(thread) */
   struct list_elem donation_elem; /* struct donations list를 위한 elem */
 
-  /* ----------- added for project.1-2 ----------- */
-  /* CPU사용을 얼마나 양보했는가를 표현하는 정수
-     nice lower : decrease priority
-     nice higher : increase priority
-     즉, 양보를 많이했다는 것은 우선순위가 낮다는 얘기다.
+  /* ----------- added for project.1-3 ----------- */
+
+  /**
+   * @brief CPU사용을 얼마나 양보할지 표현하는 정수
+   *  
+   * @details nice lower : decrease priority
+   *          nice higher : increase priority
+   * 
+   *          즉, nice가 높을수록 양보할 쓰레드라는것을 의미하므로
+   *          priority가 낮아진다.
   */
   int nice;
-  int recent_cpu;
+  int recent_cpu; /* **최근** CPU사용량을 표현하는 Fixed_Point */
+
+  /* 모든 쓰레드를 관리하는 all_thread_list를 위한 elem */;
+  struct list_elem all_thread_elem;
 
   /* --------------------------------------------- */
 
@@ -173,16 +203,30 @@ struct thread {
 
 /* Alarm Clock */
 bool is_idle_thread(struct thread *t);
-void thread_set_wakeup_ticks(struct thread *t, int64_t ticks);
+
 void thread_sleep(int64_t ticks);
 void thread_check_awake(int64_t ticks);
+void thread_set_wakeup_ticks(struct thread *t, int64_t ticks);
 
 /* ----------- added for Project.1-2 ----------- */
 
 bool priority_ascending_sort(const struct list_elem *a,
                              const struct list_elem *b, void *aux);
 void preempt_schedule(void);
-void print_priority(struct list *list);
+
+/* ----------- added for Project.1-3 ----------- */
+
+void thread_all_update_priority(void);
+void thread_set_priority_mlfqs(struct thread *t);
+
+int thread_calc_load_avg(int load_avg, int ready_thread_cnt);
+void thread_update_load_avg(void);
+
+int thread_calc_decay(void);
+
+void thread_update_recent_cpu_of_all(void);
+void thread_increase_recent_cpu_of_running(void);
+void thread_update_recent_cpu(struct thread *t);
 
 /* -------------------------------------------- */
 

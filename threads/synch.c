@@ -81,17 +81,6 @@ static void donate_priority(void) {
     }
 
     depth++;
-
-    //   if (lock->holder->priority < curr_t->priority) {
-    //     lock->holder->priority = curr_t->priority;
-    //     list_push_back(&lock->holder->donations, &curr_t->donation_elem);
-    //   }
-
-    //   curr_t = lock->holder;
-    //   lock = curr_t->wait_on_lock;
-
-    //   depth++;
-    // }
   }
 }
 /**
@@ -323,7 +312,16 @@ void lock_acquire(struct lock *lock) {
   if (lock->holder != NULL) {
     cur_t->wait_on_lock = lock;
     list_push_back(&(lock->holder->donations), &(cur_t->donation_elem));
-    donate_priority();
+
+    /* ---------- added for Project.1-2 ---------- */
+
+    // donate_priority();
+
+    /* ---------- added for Project.1-3 ---------- */
+
+    if (!thread_mlfqs) donate_priority();
+
+    /* ------------------------------------------- */
   }
 
   sema_down(&lock->semaphore);
@@ -360,7 +358,16 @@ void lock_release(struct lock *lock) {
   ASSERT(lock_held_by_current_thread(lock));
 
   remove_donor_lock(lock);
-  update_priority_donation();
+
+  /* ---------- added for Project.1-2 ---------- */
+
+  // update_priority_donation();
+
+  /* ---------- added for Project.1-3 ---------- */
+
+  if (!thread_mlfqs) update_priority_donation();
+
+  /* ------------------------------------------- */
 
   lock->holder = NULL;
   sema_up(&lock->semaphore);
