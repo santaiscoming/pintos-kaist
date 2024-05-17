@@ -207,8 +207,8 @@ recent_cpu는 시간이 지남에 따라 감쇄되어야 하는데 thread가 cpu
 
   - [x] `timer_interrupt()`
     - EACH **1 ticks (RUNNING THREAD)** increase `recent_cpu` by **1**
-    - EACH **1 SEC (ALL THREAD)** re-calculate `recent_cpu` and `priority`
-    - EACH **4 TICKS (Global Var)** re-calculate `load_avg`
+    - EACH **1 SEC (ALL THREAD)** re-calculate `recent_cpu` and `load_avg`
+    - EACH **4 TICKS (Global Var)** re-calculate `priority`
 
 # 🤔 의문점
 
