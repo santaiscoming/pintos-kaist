@@ -15,7 +15,7 @@
 
    (The above are computed via simulation in mlfqs.pm.)
 
-   "착한" 구현의 정확성을 측정합니다.
+   "nice" 구현의 정확성을 측정합니다.
 
    "fair" 테스트는 2개 또는 20개의 스레드를 모두 0으로 설정하여 실행합니다.
    스레드는 모두 거의 동일한 수의 틱을 수신해야 합니다.
