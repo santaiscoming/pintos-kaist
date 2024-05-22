@@ -1,4 +1,4 @@
-# Project 1
+# PROJECT 1
 
 ## 📌 알아두면 좋은 사항
 
@@ -300,3 +300,35 @@ recent_cpu는 스케쥴링에 변하지않는다
 단, nice라는 값은 얼마나 양보해야하는지 설정하는 값 즉, priority를 결정하는 값이기에 스케쥴링을 다시한다.
 
 허나 prioirty를 4tick마다 변경하기에 nice를 업데이트하자마자 스케쥴링을 다시하는것은 비효율적이 아닐까싶다.
+
+# PROJECT 2
+
+## PROJECT 2-1 "PASSING ARGMENT"
+
+### args
+
+command line의 길이는 128바이트로 제한되어있다. (GITBOOK)
+
+args의 구분은 공백으로 해준다. 즉, argv의 최대 개수는 64 + 1(argv의 끝인 NULL)이다.
+
+### initd(), process_create_initd()
+
+여기서의 d는 OS를 보조하기위한 **daemon process**을 의미한다.
+
+즉, 사용자의 프로그램이 실행되기 전에 먼저 실행되는 프로세스이다.
+
+`process_create_initd()`의 설명을 보면 `initd()`라는 userland program을 실행한다고 써있는데 이는 `initd()`가 사용자영역에서 실행되므로 userland program이라고 표현한것이라 생각한다,..
+
+### 📝 구현 함수
+
+- create
+
+  - [ ] `push_argument_stack()`
+    - [ ] stack에 argument를 넣는다 [argment 컨벤션](https://casys-kaist.github.io/pintos-kaist/project2/argument_passing.html)
+  - [ ] `parse_argument()`
+    - [ ] argument를 parsing한다
+
+- modify
+
+  - [ ] `process_exec()`
+  - [ ] `load()`
