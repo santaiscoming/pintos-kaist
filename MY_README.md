@@ -323,12 +323,46 @@ args의 구분은 공백으로 해준다. 즉, argv의 최대 개수는 64 + 1(a
 
 - create
 
-  - [ ] `push_argument_stack()`
-    - [ ] stack에 argument를 넣는다 [argment 컨벤션](https://casys-kaist.github.io/pintos-kaist/project2/argument_passing.html)
-  - [ ] `parse_argument()`
-    - [ ] argument를 parsing한다
+  - [x] `push_argument_stack()`
+    - [x] stack에 argument를 넣는다 [argment 컨벤션](https://casys-kaist.github.io/pintos-kaist/project2/argument_passing.html)
+  - [x] `parse_argument()`
+    - [x] argument를 parsing한다
 
 - modify
 
-  - [ ] `process_exec()`
-  - [ ] `load()`
+  - [x] `process_exec()`
+  - [x] `load()`
+
+### 🎉 성공화면
+
+#### 실행방법
+
+```bash
+pintos --fs-disk=10 -p tests/userprog/args-single:args-single -- -q -f run 'args-single onearg'
+```
+
+#### 결과
+
+```bash
+root@f6123af02b64:/pintos-kaist/userprog/build# pintos --fs-disk=10 -p tests/userprog/args-single:args-single -- -q -f run 'args-single onearg'
+qemu-system-x86_64: warning: TCG doesn't support requested feature: CPUID.01H:ECX.vmx [bit 5]
+Kernel command line: -q -f put args-single run 'args-single onearg'
+0 ~ 9fc00 1
+100000 ~ ffe0000 1
+Pintos booting with:
+        base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+        ext_mem: 0x100000 ~ 0xffe0000 (Usable: 260,992 kB)
+Calibrating timer...  52,377,600 loops/s.
+hd0:0: detected 305 sector (152 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 102 sector (51 kB) disk, model "QEMU HARDDISK", serial "QM00003"
+Formatting file system...done.
+Boot complete.
+Putting 'args-single' into the file system...
+Executing 'args-single onearg':
+000000004747ffc0                          00 00 00 00 00 00 00 00 |        ........|
+000000004747ffd0  ed ff 47 47 00 00 00 00-f9 ff 47 47 00 00 00 00 |..GG......GG....|
+000000004747ffe0  00 00 00 00 00 00 00 00-00 00 00 00 00 61 72 67 |.............arg|
+000000004747fff0  73 2d 73 69 6e 67 6c 65-00 6f 6e 65 61 72 67 00 |s-single.onearg.|
+system call!
+```
