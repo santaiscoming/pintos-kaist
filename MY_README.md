@@ -1,5 +1,10 @@
 # PROJECT 1
 
+## ✅ TODO LIST
+
+- **kernel mode** 에서 돌아가는 `int`에 대해서 정리하자
+  - kaist ppt에 자세히 나와있다.
+
 ## 📌 알아두면 좋은 사항
 
 ### BLOCKED 상태와 READY 상태는 다르다.
@@ -365,4 +370,78 @@ Executing 'args-single onearg':
 000000004747ffe0  00 00 00 00 00 00 00 00-00 00 00 00 00 61 72 67 |.............arg|
 000000004747fff0  73 2d 73 69 6e 67 6c 65-00 6f 6e 65 61 72 67 00 |s-single.onearg.|
 system call!
+```
+
+## PROJECT 2-2 system call
+
+### 개념정리
+
+- system call은 커널모드에서 실행하고 사용자모드로 return 한다
+
+### 구현 개요
+
+`syscall-nr.h`에 시스템콜 번호가 적혀있다.
+
+`%rax`에 시스템 콜 번호가 넘어온다.
+
+### 📝 구현 및 수정 함수
+
+- ⭐️⭐️ test를 돌리려면 `process_wait`부터 구현해야한다.
+
+  - [ ] `process_wait()`
+
+- 어떤 시스템콜인지 확인하는 함수
+
+  - [ ] `syscall_handler()`
+
+- 해당 시스템콜에 해당하는 핸들러 구현
+
+  - process
+    - [ ] `halt()`
+    - [ ] `exit()`
+    - [ ] `exec()`
+    - [ ] `wait()`
+  - file
+    - [ ] `create()`
+    - [ ] `remove()`
+    - [ ] `open()`
+    - [ ] `filesize()`
+    - [ ] `read()`
+    - [ ] `write()`
+    - [ ] `seek()`
+    - [ ] `tell()`
+    - [ ] `close()`
+
+- 상위 **프로세스**(parent)와 하위 **프로세스**(child)의 **계층적** 구조 (hierarchy)
+
+  - [ ] `struct thread` 멤버변수 추가
+    - [ ] pointer to parent `struct thread* `
+    - [ ] pointer to sibling `struct list`
+    - [ ] pointer to child `struct list_elem`
+
+- `semaphore`를 사용한 프로세스간의 동기화
+  - [ ] `struct thread` 멤버변수 추가
+    - [ ] `exit_status` : 프로세스의 종료상태를 저장하는 변수
+
+### one more thing
+
+- linux의 `exec`은 unix의 `exec`와 다르다. linux의 `exec`는 `execv`와 같은 기능을 한다.
+
+### 사용할 함수
+
+```c
+/* Powers down the machine we're running on,
+   as long as we're running on Bochs or QEMU. */
+void
+power_off (void) {
+#ifdef FILESYS
+	filesys_done ();
+#endif
+
+	print_stats ();
+
+	printf ("Powering off...\n");
+	outw (0x604, 0x2000);               /* Poweroff command for qemu */
+	for (;;);
+}
 ```
