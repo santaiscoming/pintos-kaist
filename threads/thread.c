@@ -471,9 +471,17 @@ void thread_init(void) {
   lock_init(&tid_lock);
 
   list_init(&ready_list);
-  list_init(&sleep_list);
   list_init(&destruction_req);
+
+  /* --------------- added for PROJECT.1-1 --------------- */
+
+  list_init(&sleep_list);
+
+  /* --------------- added for PROJECT.1-3 --------------- */
+
   list_init(&all_thread_list);
+
+  /* ----------------------------------------------------- */
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread();
@@ -619,7 +627,21 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
   new_t->tf.cs = SEL_KCSEG;
   new_t->tf.eflags = FLAG_IF;
 
-  /* ------------- added for Project.2-1 ------------- */
+  /* ------------- added for Project.2-2 ------------- */
+
+  /* 512 바이트만큼만 할당하면 되기에 malloc 으로
+    (file ptr (8byte) * entry cnt : 64) 할당하면 됐지만
+    운영체제에선 page단위로 메모리를 할당하기에 조금 낭비가 있더라도
+    이대로 사용하는게 좋다고 판단 */
+  new_t->fdt = palloc_get_multiple(PAL_ZERO, 1);
+  if (new_t->fdt == NULL) return TID_ERROR; /* 메모리 할당 실패 */
+
+  new_t->fdt[0] = STDIN_FILENO;  /* 표준 입력 stdin */
+  new_t->fdt[1] = STDOUT_FILENO; /* 표준 출력 stdout */
+
+  new_t->next_fd = 2; /* 다음으로 할당될 fd 번호 */
+
+  /* ------------- added for Project.1-1 ------------- */
 
   /* 새로 생성한 쓰레드를 ready_queue에 넣는다. thread_unblock()
      이라는 함수 명에 혼동되면 안된다. 단순히 thread의 state를 ready로
@@ -919,7 +941,7 @@ static void init_thread(struct thread *t, const char *name, int priority) {
   /* ----------- added for PROJECT.2-1 ----------- */
 
   list_init(&t->child_list); /* 자식 프로세스 list 초기화 */
-  t->exit_state = 0;         /* 자식 프로세스의 종료 상태 */
+  t->exit_status = 0;        /* 자식 프로세스의 종료 상태 */
 
   /* ------------------------------------------- */
 }

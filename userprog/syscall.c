@@ -1,65 +1,13 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "filesys/filesys.h" /* added for PROJECT.2-2 */
 #include "intrinsic.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/loader.h"
 #include "threads/thread.h"
 #include "userprog/gdt.h"
-
-// struct gp_registers {
-// 	uint64_t r15;
-// 	uint64_t r14;
-// 	uint64_t r13;
-// 	uint64_t r12;
-// 	uint64_t r11;
-// 	uint64_t r10;
-// 	uint64_t r9;
-// 	uint64_t r8;
-// 	uint64_t rsi;
-// 	uint64_t rdi;
-// 	uint64_t rbp;
-// 	uint64_t rdx;
-// 	uint64_t rcx;
-// 	uint64_t rbx;
-// 	uint64_t rax;
-// } __attribute__((packed));
-
-// struct intr_frame {
-// 	/* Pushed by intr_entry in intr-stubs.S.
-// 	   These are the interrupted task's saved registers. */
-// 	struct gp_registers R;
-// 	uint16_t es;
-// 	uint16_t __pad1;
-// 	uint32_t __pad2;
-// 	uint16_t ds;
-// 	uint16_t __pad3;
-// 	uint32_t __pad4;
-// 	/* Pushed by intrNN_stub in intr-stubs.S. */
-// 	uint64_t vec_no; /* Interrupt vector number. */
-// /* Sometimes pushed by the CPU,
-//    otherwise for consistency pushed as 0 by intrNN_stub.
-//    The CPU puts it just under `eip', but we move it here. */
-// 	uint64_t error_code;
-// /* Pushed by the CPU.
-//    These are the interrupted task's saved registers. */
-// 	uintptr_t rip;
-// 	uint16_t cs;
-// 	uint16_t __pad5;
-// 	uint32_t __pad6;
-// 	uint64_t eflags;
-// 	uintptr_t rsp;
-// 	uint16_t ss;
-// 	uint16_t __pad7;
-// 	uint32_t __pad8;
-// } __attribute__((packed));
-
-/* --------------- added for PROJECT.2-1 System call --------------- */
-
-#include "lib/user/syscall.h"
-
-/* ----------------------------------------------------- */
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -101,7 +49,7 @@ void syscall_init(void) {
 */
 
 void syscall_handler(struct intr_frame *f UNUSED) {
-  /* --------------- added for PROJECT.2-1 --------------- */
+  /* --------------- added for PROJECT.2-2 --------------- */
 
   int syscall_num = f->R.rax;
 
@@ -115,12 +63,10 @@ void syscall_handler(struct intr_frame *f UNUSED) {
       break;
 
       // case SYS_FORK: /* const char *thread_name */
-      //   check_user_address(f->R.rdi);
       //   fork(f->R.rdi);
       //   break;
 
       // case SYS_EXEC: /* const char *file */
-      //   check_user_address(f->R.rdi);
       //   exec(f->R.rdi);
       //   break;
 
@@ -128,18 +74,15 @@ void syscall_handler(struct intr_frame *f UNUSED) {
       //   wait(f->R.rdi);
       //   break;
 
-      // case SYS_CREATE: /* const char *file, unsigned initial_size */
-      //   check_user_address(f->R.rdi);
-      //   create(f->R.rdi, f->R.rsi);
-      //   break;
+    case SYS_CREATE: /* const char *file, unsigned initial_size */
+      create(f->R.rdi, f->R.rsi);
+      break;
 
-      // case SYS_REMOVE: /* const char *file */
-      //   check_user_address(f->R.rdi);
-      //   remove(f->R.rdi);
-      //   break;
+    case SYS_REMOVE: /* const char *file */
+      remove(f->R.rdi);
+      break;
 
       // case SYS_OPEN: /* const char *file */
-      //   check_user_address(f->R.rdi);
       //   open(f->R.rdi);
       //   break;
 
@@ -148,12 +91,10 @@ void syscall_handler(struct intr_frame *f UNUSED) {
       //   break;
 
       // case SYS_READ: /* int fd, void *buffer, unsigned length */
-      //   check_user_address(f->R.rsi);
       //   read(f->R.rdi, f->R.rsi, f->R.rdx);
       //   break;
 
       // case SYS_WRITE: /* int fd, const void *buffer, unsigned length */
-      //   check_user_address(f->R.rsi);
       //   write(f->R.rdi, f->R.rsi, f->R.rdx);
       //   break;
 
@@ -173,12 +114,12 @@ void syscall_handler(struct intr_frame *f UNUSED) {
       //   dup2(f->R.rdi, f->R.rsi);
       //   break;
 
-      // default: /* undefined syscall */
-      //   exit(-1);
-      //   break;
+    default: /* undefined syscall */
+      exit(-1);
+      break;
   }
 
-  /* --------------- before PROJECT.2-1 --------------- 
+  /* --------------- before PROJECT.2-2 --------------- 
   printf("system call!\n"); */
 
   /* ----------------------------------------------------- */
@@ -186,7 +127,7 @@ void syscall_handler(struct intr_frame *f UNUSED) {
   thread_exit();
 }
 
-/* --------------- added for PROJECT.2-1 --------------- */
+/* --------------- added for PROJECT.2-2 --------------- */
 
 /**
  * @brief pointer address가 kernel address에 접근하는지 확인하고
@@ -200,17 +141,53 @@ void check_user_address(const void *addr) {
   }
 }
 
+/**
+ * @brief pintOS를 종료한다.
+*/
 void halt(void) { power_off(); }
 
+/**
+ * @brief current Process를 종료한다.
+ * 
+ * @param status Process의 종료 상태
+ * 
+ * @details process 정상종료 ? status = 0 : status = -1
+*/
 void exit(int status) {
   struct thread *cur = thread_current();
-  cur->exit_state = status;
+
+  cur->exit_status = status;
 
   printf("%s: exit(%d)\n", cur->name, status);
 
   thread_exit();
+}
 
-  cur->tf.R.rax = status;
+/**
+ * @brief 파일을 생성한다.
+ * 
+ * @param file 생성할 파일의 이름 및 경로 정보
+ * @param initial_size 생성할 파일 크기
+ * 
+ * @return bool 파일 생성 성공 여부
+*/
+bool create(const char *file, unsigned initial_size) {
+  check_user_address(file);
+
+  return filesys_create(file, initial_size);
+}
+
+/**
+ * @brief 파일을 삭제한다.
+ * 
+ * @param file 삭제할 파일의 이름 및 경로 정보
+ * 
+ * @return bool 파일 삭제 성공 여부
+*/
+bool remove(const char *file) {
+  check_user_address(file);
+
+  return filesys_remove(file);
 }
 
 /* ----------------------------------------------------- */

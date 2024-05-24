@@ -13,6 +13,10 @@
 
 #include "threads/synch.h"
 
+/* --------------- added for PROJECT.2-2 --------------- */
+
+#include "file.h"
+
 /* ----------------------------------------------------- */
 
 /* States in a thread's life cycle. */
@@ -91,6 +95,11 @@ extern int load_avg;
 
 #define DIV_FP(x, y) (((int64_t)x) * F / y)
 #define DIV_FP_AND_INT(x, n) (x / n)
+
+/* ------------ added for Project.1-3 ------------ */
+
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
 
 /* ----------------------------------------------- */
 
@@ -190,8 +199,13 @@ struct thread {
 
   /* --------------- added for PRJECT.2-1  --------------- */
 
-  int exit_state;         /* 쓰레드의 종료 상태 */
-  int success_load_state; /* load 성공 여부 */
+  int exit_status;         /* 쓰레드의 종료 상태 */
+  int success_load_status; /* load 성공 여부 */
+
+  /* for file manipulation */
+  struct file **fdt; /* file descriptor table */
+  int next_fd;       /* 테이블에 등록된 fd + 1
+                           즉, 다음에 저장될 fd의 값을 의미한다 */
 
   struct semaphore exec_lock; /* exec의 성공 여부를 기다리는 lock */
   struct semaphore exit_lock; /* 자식 쓰레드의 종료를 기다리는 lock */
