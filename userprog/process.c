@@ -441,10 +441,23 @@ int process_wait(tid_t child_tid UNUSED) {
 */
 void process_exit(void) {
   struct thread *curr = thread_current();
-  /* TODO: Your code goes here.
-	 * TODO: Implement process termination message (see
-	 * TODO: project2/process_termination.html).
-	 * TODO: We recommend you to implement process resource cleanup here. */
+
+  /* --------------- added for PROJECT.2-2 --------------- */
+
+  int max_fd = curr->next_fd;
+  struct file *file;
+
+  for (int fd = 2; fd < max_fd; fd++) {
+    file = process_get_file(fd);
+
+    if (!file) continue;
+
+    process_close_file(fd); /* close_file() && FDT[fd] init */
+  }
+
+  palloc_free_page(curr->fdt); /* deallocate FDT */
+
+  /* ----------------------------------------------------- */
 
   process_cleanup();
 }
@@ -578,7 +591,6 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
  * 					user가 사용한 데이터의 시작점인 rsp는 데이터 struct인 intr_frame->rsp에 저장된다.
  * 
  * 					❌ user process Stack의 데이터를 저장하는것이 아니다.
- * 
 */
 static bool load(const char *file_name, struct intr_frame *if_) {
   struct thread *t = thread_current();

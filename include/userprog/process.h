@@ -18,6 +18,8 @@ void push_argment_stack(char *argv[], int argc, struct intr_frame *_if);
 /* --------------- added for PROJECT.2-1 --------------- */
 
 int process_add_file(struct file *file_p);
+struct file *process_get_file(int fd);
+void process_close_file(int fd);
 
 /* ----------------------------------------------------- */
 

@@ -633,7 +633,7 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
     (file ptr (8byte) * entry cnt : 64) 할당하면 됐지만
     운영체제에선 page단위로 메모리를 할당하기에 조금 낭비가 있더라도
     이대로 사용하는게 좋다고 판단 */
-  new_t->fdt = palloc_get_multiple(PAL_ZERO, 1);
+  new_t->fdt = palloc_get_page(PAL_ZERO);
   if (new_t->fdt == NULL) return TID_ERROR; /* 메모리 할당 실패 */
 
   new_t->fdt[0] = STDIN_FILENO;  /* 표준 입력 stdin */
