@@ -619,10 +619,11 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
   new_t->tf.cs = SEL_KCSEG;
   new_t->tf.eflags = FLAG_IF;
 
-  /* 새로 생성한 쓰레드를 ready_queue에 넣는다.
-     thread_unblock() 이라는 함수 명에 혼동되면 안된다.
-     단순히 thread의 state를 ready로 바꿔주는것 뿐만 아니라
-     ready_list에 넣어주는 역할도 한다. */
+  /* ------------- added for Project.2-1 ------------- */
+
+  /* 새로 생성한 쓰레드를 ready_queue에 넣는다. thread_unblock()
+     이라는 함수 명에 혼동되면 안된다. 단순히 thread의 state를 ready로
+     바꿔주는것 뿐만 아니라 ready_list에 넣어주는 역할도 한다. */
   thread_unblock(new_t);
 
   /* ------------- added for Project.1-3 ------------- */
@@ -759,13 +760,14 @@ void thread_exit(void) {
      We will be destroyed during the call to schedule_tail(). */
   intr_disable();
 
-  /* ------------- added for Project.1-3 ------------- */
+  /* --------------- added for PROJECT.1-3 --------------- */
 
   list_remove(&thread_current()->all_thread_elem);
 
-  /* ------------------------------------------------- */
+  /* ----------------------------------------------------- */
 
   do_schedule(THREAD_DYING);
+
   NOT_REACHED();
 }
 
@@ -899,20 +901,25 @@ static void init_thread(struct thread *t, const char *name, int priority) {
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
-  /* ----------- added for Project.1-1 ----------- */
+  /* ----------- added for PROJECT.1-1 ----------- */
 
   t->wakeup_ticks = WAKEUP_TICKS_DEFAULT;
 
-  /* ----------- added for Project.1-2 ----------- */
+  /* ----------- added for PROJECT.1-2 ----------- */
 
   t->initial_priority = priority;
   t->wait_on_lock = NULL;
   list_init(&t->donations);
 
-  /* ----------- added for Project.1-3 ----------- */
+  /* ----------- added for PROJECT.1-3 ----------- */
 
   t->nice = NICE_DEFAULT;
   t->recent_cpu = RECENT_CPU_DEFAULT;
+
+  /* ----------- added for PROJECT.2-1 ----------- */
+
+  list_init(&t->child_list); /* 자식 프로세스 list 초기화 */
+  t->exit_state = 0;         /* 자식 프로세스의 종료 상태 */
 
   /* ------------------------------------------- */
 }
