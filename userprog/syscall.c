@@ -235,6 +235,7 @@ int filesize(int fd) {
 
   return file_length(file_p);
 }
+
 /**
  * @brief fd에 해당하는 file에서 length만큼 읽어 buffer에 저장한다.
  * 
@@ -244,7 +245,15 @@ int filesize(int fd) {
  * 
  * @return int 읽어온 데이터의 크기
  * 
- * @details input_getc() : 키보드로부터 한 문자를 읽어온다. 키보드를 입력하지
+ * @details [use case]
+ *          if (fd == 0)
+ *          키보드의 모든 입력이 read()로 처리된다. 현실세계(?)에서 터미널, 게임, 
+ *          타자연습 등등 사용했던 모든 키보드 입력은 read() 시스템콜이었다.
+ *          
+ *          else 
+ *          file에서 읽어오는 경우다. file에서 length만큼 읽어 buffer에 저장한다.
+ * 
+ *          input_getc() : 키보드로부터 한 문자를 읽어온다. 키보드를 입력하지
  *          않았을땐 계속해서 기다린다.
  * 
  *          input_getc() 예제를 통해 이해해보자.
@@ -258,14 +267,6 @@ int filesize(int fd) {
  * 
  *          file_read() : Reads SIZE bytes from FILE into BUFFER,
  *          즉, file에서 length만큼 읽어서 buffer(user가 볼 수 있는)에 저장한다.
- *          
- *          [use case]
- *          if (fd == 0)
- *          키보드의 모든 입력이 read()로 처리된다. 현실세계(?)에서 터미널, 게임, 
- *          타자연습 등등 사용했던 모든 키보드 입력은 read() 시스템콜이었다.
- *          
- *          else 
- *          file에서 읽어오는 경우다. file에서 length만큼 읽어 buffer에 저장한다.
 */
 int read(int fd, void *buffer, unsigned length) {
   struct thread *curr = thread_current();
@@ -293,15 +294,67 @@ int read(int fd, void *buffer, unsigned length) {
     return length;
   }
 
-  file_p = process_get_file(fd); /* fd에 해당하는 file을 가져온다 */
+  else {
+    file_p = process_get_file(fd); /* fd에 해당하는 file을 가져온다 */
 
-  if (!file_p) return -1;
+    if (!file_p) return -1;
 
-  read_bytes = file_read(file_p, buffer, length);
+    read_bytes = file_read(file_p, buffer, length);
+  }
 
   lock_release(&filesys_lock); /* read()시에 동기화 문제를 위한 lock 해제 */
 
   return read_bytes;
+}
+
+/**
+ * @brief buffer에 있는 데이터를 fd에 해당하는 file에 length 만큼 저장한다.
+ * 
+ * @param fd file descriptor
+ * @param buffer file에 저장할 데이터
+ * @param length file에 저장할 데이터의 크기
+ * 
+ * @return int file에 저장된 데이터의 크기
+ * 
+ * @details [use case]
+ *          if (fd == 1)
+ *          -> 터미널에 출력하는 경우, 한발 더 나아가 모니터에 출력된다고 봐도
+ *          무방하다
+ * 
+ *          else
+ *          -> file에 저장하는 경우다. file에 buffer에 있는 데이터를 length만큼
+ *          저장한다.
+ * 
+ *          putbuf() : buffer에 있는 데이터를 length만큼 console에 출력한다.
+*/
+int write(int fd, const void *buffer, unsigned length) {
+  struct thread *curr = thread_current();
+  struct file *file_p;
+  int write_bytes = 0;
+
+  /* exception handling */
+  check_user_address(buffer);
+  if (fd < 0 || curr->next_fd <= fd) return -1;
+
+  lock_acquire(&filesys_lock); /* write()시에 동기화 문제를 위한 lock */
+
+  /* (fd == 1) 즉, 표준 출력으로 출력하는 경우 */
+  if (fd == 1) {
+    putbuf(buffer, length);
+    write_bytes = length;
+  }
+
+  else {
+    file_p = process_get_file(fd); /* fd에 해당하는 file을 가져온다 */
+
+    if (!file_p) return -1;
+
+    write_bytes = file_write(file_p, buffer, length);
+  }
+
+  lock_release(&filesys_lock); /* write()시에 동기화 문제를 위한 lock 해제 */
+
+  return write_bytes;
 }
 
 /* ----------------------------------------------------- */
