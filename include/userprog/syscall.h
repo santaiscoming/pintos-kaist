@@ -1,7 +1,12 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 
-#include <stdbool.h> /* added for PROJECT.2-1 */
+/* --------------- added for PROJECT.2-1 --------------- */
+
+#include <stdbool.h>
+#include <synch.h>
+
+/* ----------------------------------------------------- */
 
 void syscall_init(void);
 
@@ -10,6 +15,8 @@ void syscall_init(void);
 void check_user_address(const void *addr);
 
 /* --------------- System Calls  --------------- */
+
+struct lock filesys_lock; /* read(), write()시에 동기화 문제를 위한 lock  */
 
 void halt(void);
 void exit(int status);

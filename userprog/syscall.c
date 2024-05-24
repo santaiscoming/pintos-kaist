@@ -3,6 +3,7 @@
 #include <syscall-nr.h>
 #include "filesys/filesys.h" /* added for PROJECT.2-2 */
 #include "intrinsic.h"
+#include "synch.h" /* added for PROJECT.2-2 */
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/loader.h"
@@ -35,6 +36,12 @@ void syscall_init(void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
   write_msr(MSR_SYSCALL_MASK,
             FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+
+  /* --------------- added for PROJECT.2-2 --------------- */
+
+  lock_init(&filesys_lock); /* read(), write()시에 동기화 문제를 위한 lock  */
+
+  /* ----------------------------------------------------- */
 }
 
 /**
