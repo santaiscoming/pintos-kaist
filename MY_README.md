@@ -396,9 +396,9 @@ system call!
 
 - `thread_create()` 내부
 
-  - [ ] file descriptor table 초기화
-  - [ ] **initailize** pointer to file descriptor table
-  - [ ] **reserve** fd0, fd1 for STDIN, STDOUT
+  - [x] file descriptor table 초기화
+  - [x] **initailize** pointer to file descriptor table
+  - [x] **reserve** fd0, fd1 for STDIN, STDOUT
 
 - `process_exit()` 내부 (when terminated thread(process 종료))
 
@@ -421,20 +421,20 @@ system call!
 - 해당 시스템콜에 해당하는 핸들러 구현
 
   - process
-    - [ ] `halt()`
+    - [x] `halt()`
     - [ ] `exit()`
     - [ ] `exec()`
     - [ ] `wait()`
   - file
-    - [ ] `create()`
-    - [ ] `remove()`
+    - [x] `create()`
+    - [x] `remove()`
     - [ ] `open()`
     - [ ] `filesize()`
     - [ ] `read()`
     - [ ] `write()`
     - [ ] `seek()`
     - [ ] `tell()`
-    - [ ] `close()`
+    - [x] `close()`
 
 - 상위 **프로세스**(parent)와 하위 **프로세스**(child)의 **계층적** 구조 (hierarchy)
 
