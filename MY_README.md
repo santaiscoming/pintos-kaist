@@ -378,13 +378,37 @@ system call!
 
 - system call은 커널모드에서 실행하고 사용자모드로 return 한다
 
-### 구현 개요
+- `process`는 사실 `thread`이다. pintos에서 확인할 수 있는 가장 쉬운 방법은 `process_create_initd()`를 호출할때도 내부적으로 `thread_create(initd)`를 전달해주기도 하기 떄문이다.
 
-`syscall-nr.h`에 시스템콜 번호가 적혀있다.
+### 구현 Tip
 
-`%rax`에 시스템 콜 번호가 넘어온다.
+- `syscall-nr.h`에 시스템콜 번호가 적혀있다.
+
+- `%rax`에 시스템 콜 번호가 넘어온다.
+
+- `lib/user/syscall.c` 함수들은 user program에서만 호출 가능하다.
+
+-
 
 ### 📝 구현 및 수정 함수
+
+#### file manipulation
+
+- `thread_create()` 내부
+
+  - [ ] file descriptor table 초기화
+  - [ ] **initailize** pointer to file descriptor table
+  - [ ] **reserve** fd0, fd1 for STDIN, STDOUT
+
+- `process_exit()` 내부 (when terminated thread(process 종료))
+
+  - [ ] close all files
+  - [ ] free file descriptor table
+
+- `file system call` 이 호출될때 **race condition**을 방지하기 위해 `global lock`을 사용한다.
+
+  - [ ] `syscall.h`에 `struct lock filesys_lock` 추가
+  - [ ] `syscall_init()`에서 `lock_init(&filesys_lock)` 추가
 
 - ⭐️⭐️ test를 돌리려면 `process_wait`부터 구현해야한다.
 
@@ -445,3 +469,27 @@ power_off (void) {
 	for (;;);
 }
 ```
+
+### 트러블슈팅
+
+#### fd table 할당시 메모리 동적 할당 방식 고민
+
+fd table을 정적할당 하려고 했다. 하지만 정적할당한 페이지는 프로그램 시작부터 끝까지 진행될 터이고프로세스가 종료되면 수거할 수 있는 동적할당이 낫다고 판단했다.
+
+`malloc`을 사용해도 가능했고 `palloc`을 사용해도 가능했지만 OS 특성상 page 단위로 메모리를 관리하기에 `palloc`을 사용했다.
+
+### 커널
+
+커널이란?
+
+커널은 프로세스가 아닌 **운영체제**의 서비스를 제공하는 함수, 데이터의 집합체다.
+
+커널영역 이라는 단어떄문에 커널이 하나의 프로세스 처럼 보이지만 커널은 프로세스가 아니다.
+
+커널영역이라는것은 커널이 제공할 서비스를 메모리에 적재하고있고 해당 주소(메모리블럭)집합을 커널영역이라 부른다.
+
+커널영역은 시스템콜이나 인터럽트를 처리할때만 접근할 수 있다.
+
+커널은 프로세스가 아니기에 스택과 힙 영역이 존재하지 않지만 커널쓰레드로써 작업을 수행할 수 있다.
+
+즉, 프로세스는 아니지만 커널 쓰레드라는 형태로 실행되기에 스택과 힙을 사용할 수 있다.
