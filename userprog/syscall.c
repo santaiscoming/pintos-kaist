@@ -235,5 +235,73 @@ int filesize(int fd) {
 
   return file_length(file_p);
 }
+/**
+ * @brief fd에 해당하는 file에서 length만큼 읽어 buffer에 저장한다.
+ * 
+ * @param fd file descriptor
+ * @param buffer file에서 읽어온 데이터를 저장할 buffer
+ * @param length 읽어올 데이터의 크기
+ * 
+ * @return int 읽어온 데이터의 크기
+ * 
+ * @details input_getc() : 키보드로부터 한 문자를 읽어온다. 키보드를 입력하지
+ *          않았을땐 계속해서 기다린다.
+ * 
+ *          input_getc() 예제를 통해 이해해보자.
+ *          user가 "abcdef"를 입력할것이라 가정하자
+ *          그렇다면 a를 입력했을때 즉, keyboard를 눌렀을떄 input_getc()가 
+ *          호출되어 'a'를 반환하게 된다.
+ *          그리고 for문을 통해 length만큼 반복되지 않았따면 계속해서
+ *          input_getc()는 기다린다.
+ * 
+ *          이후 enter(= '\n')을 입력하게 되면 for문을 탈출한다.
+ * 
+ *          file_read() : Reads SIZE bytes from FILE into BUFFER,
+ *          즉, file에서 length만큼 읽어서 buffer(user가 볼 수 있는)에 저장한다.
+ *          
+ *          [use case]
+ *          if (fd == 0)
+ *          키보드의 모든 입력이 read()로 처리된다. 현실세계(?)에서 터미널, 게임, 
+ *          타자연습 등등 사용했던 모든 키보드 입력은 read() 시스템콜이었다.
+ *          
+ *          else 
+ *          file에서 읽어오는 경우다. file에서 length만큼 읽어 buffer에 저장한다.
+*/
+int read(int fd, void *buffer, unsigned length) {
+  struct thread *curr = thread_current();
+  struct file *file_p;
+  int read_bytes = 0;
+
+  /* exception handling */
+  check_user_address(buffer);
+  if (fd < 0 || curr->next_fd <= fd) return -1;
+
+  lock_acquire(&filesys_lock); /* read()시에 동기화 문제를 위한 lock */
+
+  /* (fd == 0) 즉, 키보드의 입력을 받는경우 */
+  if (fd == 0) {
+    for (unsigned i = 0; i < length; i++) {
+      ((char *)buffer)[i] = input_getc();
+
+      if (((char *)buffer)[i] == '\n') { /* "enter" 입력시 탈출 */
+        i++;
+        length = i;
+        break;
+      }
+    }
+
+    return length;
+  }
+
+  file_p = process_get_file(fd); /* fd에 해당하는 file을 가져온다 */
+
+  if (!file_p) return -1;
+
+  read_bytes = file_read(file_p, buffer, length);
+
+  lock_release(&filesys_lock); /* read()시에 동기화 문제를 위한 lock 해제 */
+
+  return read_bytes;
+}
 
 /* ----------------------------------------------------- */
