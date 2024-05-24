@@ -135,8 +135,13 @@ tid_t process_create_initd(const char *file_name) {
   if (fn_copy == NULL) return TID_ERROR;
   strlcpy(fn_copy, file_name, PGSIZE);
 
+  /* --------------- added for PROJECT.2-1 --------------- */
+
+  char *thread_name, *save_ptr;
+  thread_name = strtok_r(fn_copy, " ", &save_ptr);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create(file_name, PRI_DEFAULT, initd, fn_copy);
+  tid = thread_create(thread_name, PRI_DEFAULT, initd, fn_copy);
   if (tid == TID_ERROR) palloc_free_page(fn_copy);
   return tid;
 }
@@ -314,11 +319,13 @@ int process_exec(void *f_name) {
   /* And then load the binary */
   success = load(argv[0], &_if);
 
-  /* --------------- added for project.2-1 ---------------
-     save token on user stack */
+  /* --------------- added for project.2-1 --------------- */
 
+  /* token(args)를 user Stack에 저장한다. */
   push_argment_stack(argv, argc, &_if);
-  hex_dump((uintptr_t)_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+
+  /* 주석을 해제하면 argment가 stack에 들어가있는지 확인할 수 있다.
+  hex_dump((uintptr_t)_if.rsp, _if.rsp, USER_STACK - _if.rsp, true); */
 
   /* ----------------------------------------------------- */
 
@@ -357,7 +364,13 @@ int process_wait(tid_t child_tid UNUSED) {
   /* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-  while (1);
+
+  // tid_t 를 이용해 child process를 찾는다.
+  // caller는 child process가 종료될때까지 기다려야한다.
+  // child process가 종료되면 종료 상태를 반환한다.
+
+  for (size_t i = 0; i < 1000000000; i++) {
+  }
 
   return -1;
 }
