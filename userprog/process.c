@@ -108,6 +108,8 @@ void push_argment_stack(char *argv[], int argc, struct intr_frame *_if) {
 int process_add_file(struct file *file) {
   struct thread *curr_t = thread_current();
 
+  if (curr_t->next_fd >= 65) return -1; /* file descriptor table full */
+
   int fd_idx = curr_t->next_fd++;
 
   curr_t->fdt[fd_idx] = file;
