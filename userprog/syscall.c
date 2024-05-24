@@ -3,7 +3,8 @@
 #include <syscall-nr.h>
 #include "filesys/filesys.h" /* added for PROJECT.2-2 */
 #include "intrinsic.h"
-#include "synch.h" /* added for PROJECT.2-2 */
+#include "process.h" /* added for PROJECT.2-2 */
+#include "synch.h"   /* added for PROJECT.2-2 */
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/loader.h"
@@ -89,9 +90,9 @@ void syscall_handler(struct intr_frame *f UNUSED) {
       remove(f->R.rdi);
       break;
 
-      // case SYS_OPEN: /* const char *file */
-      //   open(f->R.rdi);
-      //   break;
+    case SYS_OPEN: /* const char *file */
+      open(f->R.rdi);
+      break;
 
       // case SYS_FILESIZE: /* int fd */
       //   filesize(f->R.rdi);
@@ -195,6 +196,27 @@ bool remove(const char *file) {
   check_user_address(file);
 
   return filesys_remove(file);
+}
+
+/**
+ * @brief file을 open하고 file descriptor를 반환한다.
+ * 
+ * @param file open할 file의 이름 및 경로 정보
+*/
+int open(const char *file) {
+  struct thread *curr = thread_current();
+  struct file *file_p;
+  int fd;
+
+  check_user_address(file);
+
+  file_p = filesys_open(file);
+
+  if (!file_p) return -1;
+
+  fd = process_add_file(file_p);
+
+  return fd;
 }
 
 /* ----------------------------------------------------- */

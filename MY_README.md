@@ -402,13 +402,13 @@ system call!
 
 - `process_exit()` 내부 (when terminated thread(process 종료))
 
-  - [ ] close all files
-  - [ ] free file descriptor table
+  - [x] close all files
+  - x] free file descriptor table
 
 - `file system call` 이 호출될때 **race condition**을 방지하기 위해 `global lock`을 사용한다.
 
-  - [ ] `syscall.h`에 `struct lock filesys_lock` 추가
-  - [ ] `syscall_init()`에서 `lock_init(&filesys_lock)` 추가
+  - [x] `syscall.h`에 `struct lock filesys_lock` 추가
+  - [x] `syscall_init()`에서 `lock_init(&filesys_lock)` 추가
 
 - ⭐️⭐️ test를 돌리려면 `process_wait`부터 구현해야한다.
 
@@ -428,7 +428,7 @@ system call!
   - file
     - [x] `create()`
     - [x] `remove()`
-    - [ ] `open()`
+    - [x] `open()`
     - [ ] `filesize()`
     - [ ] `read()`
     - [ ] `write()`
