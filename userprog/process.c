@@ -98,6 +98,63 @@ void push_argment_stack(char *argv[], int argc, struct intr_frame *_if) {
   _if->R.rsi = _if->rsp + sizeof(void *);
 }
 
+/* --------------- added for PROJECT.2-2 --------------- */
+
+/**
+ * @brief 파일을 열고 file 구조체를 반환한다.
+ * 
+ * @param file file object pointer
+*/
+int process_add_file(struct file *file) {
+  struct thread *curr_t = thread_current();
+
+  int fd_idx = curr_t->next_fd++;
+
+  curr_t->fdt[fd_idx] = file;
+
+  return fd_idx;
+}
+
+/**
+ * @brief fd에 해당하는 file을 반환한다.
+ * 
+ * @param fd file descriptor
+*/
+struct file *process_get_file(int fd) {
+  struct thread *curr_t = thread_current();
+  struct file *file;
+
+  /* 유효하지 않은 범위내의 fd가 들어왔을때 예외처리 */
+  if (fd < 2 || fd >= curr_t->next_fd) return NULL;
+
+  file = curr_t->fdt[fd];
+
+  if (file == NULL) return NULL;
+
+  return file;
+}
+
+/**
+ * @brief fd에 해당하는 file을 닫는다.
+ * 
+ * @param fd file descriptor
+*/
+void process_close_file(int fd) {
+  struct thread *curr_t = thread_current();
+  struct file *file;
+
+  /* 유효하지 않은 범위내의 fd가 들어왔을때 예외처리 */
+  if (fd < 2 || fd >= curr_t->next_fd) return;
+
+  file = curr_t->fdt[fd];
+
+  if (file == NULL) return; /* 이미 닫힌 파일이라면 return */
+
+  file_close(file); /* file close */
+
+  curr_t->fdt[fd] = NULL; /* file에 대한 fd 초기화 */
+}
+
 /* ----------------------------------------------------- */
 
 /* General process initializer for initd and other process. */
