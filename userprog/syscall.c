@@ -219,4 +219,21 @@ int open(const char *file) {
   return fd;
 }
 
+/**
+ * @brief fd에 해당하는 file의 크기를 반환한다.
+ * 
+ * @param fd file descriptor
+*/
+int filesize(int fd) {
+  struct thread *curr = thread_current();
+
+  if (fd < 0 || fd >= curr->next_fd) return -1;
+
+  struct file *file_p = process_get_file(fd);
+
+  if (!file_p) return -1;
+
+  return file_length(file_p);
+}
+
 /* ----------------------------------------------------- */

@@ -429,7 +429,7 @@ system call!
     - [x] `create()`
     - [x] `remove()`
     - [x] `open()`
-    - [ ] `filesize()`
+    - [x] `filesize()`
     - [ ] `read()`
     - [ ] `write()`
     - [ ] `seek()`
