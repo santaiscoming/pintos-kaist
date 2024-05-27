@@ -40,6 +40,10 @@ void parse_argument(char *command_line, char *argv[], int *argc) {
   char *token, *save_ptr = NULL;
   int i = 0;
 
+  ASSERT(command_line != NULL);
+  ASSERT(argv != NULL);
+  ASSERT(argc != NULL);
+
   for (token = strtok_r(command_line, " ", &save_ptr); token != NULL;
        token = strtok_r(NULL, " ", &save_ptr)) {
     argv[i++] = token;
@@ -59,7 +63,7 @@ void parse_argument(char *command_line, char *argv[], int *argc) {
 void push_argment_stack(char *argv[], int argc, struct intr_frame *_if) {
   int i, j;
   int total_length = 0;
-  char *arg_addr[argc];
+  char *arg_addr[(LOADER_ARGS_LEN / 2) + 1];
 
   /* 인수(args)를 스택에 저장한다. */
   for (i = argc - 1; i >= 0; i--) {
@@ -107,12 +111,17 @@ void push_argment_stack(char *argv[], int argc, struct intr_frame *_if) {
 */
 int process_add_file(struct file *file) {
   struct thread *curr_t = thread_current();
+  int fd_idx;
 
+  // ASSERT(file != NULL);
+
+  if (!file) return -1;
   if (curr_t->next_fd >= 65) return -1; /* file descriptor table full */
 
-  int fd_idx = curr_t->next_fd++;
+  fd_idx = curr_t->next_fd;
 
   curr_t->fdt[fd_idx] = file;
+  curr_t->next_fd++;
 
   return fd_idx;
 }
@@ -127,7 +136,8 @@ struct file *process_get_file(int fd) {
   struct file *file;
 
   /* 유효하지 않은 범위내의 fd가 들어왔을때 예외처리 */
-  if (fd < 2 || fd >= curr_t->next_fd) return NULL;
+  ASSERT(fd < 65 || fd > 2);
+  ASSERT(fd < curr_t->next_fd);
 
   file = curr_t->fdt[fd];
 
@@ -146,7 +156,7 @@ void process_close_file(int fd) {
   struct file *file;
 
   /* 유효하지 않은 범위내의 fd가 들어왔을때 예외처리 */
-  if (fd < 2 || fd >= curr_t->next_fd) return;
+  ASSERT(fd < 65 || fd > 2);
 
   file = curr_t->fdt[fd];
 
@@ -195,12 +205,12 @@ tid_t process_create_initd(const char *file_name) {
   strlcpy(fn_copy, file_name, PGSIZE);
 
   /* --------------- added for PROJECT.2-1 --------------- */
-
-  char *thread_name, *save_ptr;
-  thread_name = strtok_r(fn_copy, " ", &save_ptr);
+  // command line의 첫번째 토큰을 thread_name으로 저장한다.
+  char *ptr;
+  file_name = strtok_r(file_name, " ", &ptr);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create(thread_name, PRI_DEFAULT, initd, fn_copy);
+  tid = thread_create(file_name, PRI_DEFAULT, initd, fn_copy);
   if (tid == TID_ERROR) palloc_free_page(fn_copy);
   return tid;
 }

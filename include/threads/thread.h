@@ -15,7 +15,7 @@
 
 /* --------------- added for PROJECT.2-2 --------------- */
 
-#include "file.h"
+#include "filesys/file.h"
 
 /* ----------------------------------------------------- */
 
@@ -95,11 +95,6 @@ extern int load_avg;
 
 #define DIV_FP(x, y) (((int64_t)x) * F / y)
 #define DIV_FP_AND_INT(x, n) (x / n)
-
-/* ------------ added for Project.1-3 ------------ */
-
-#define STDIN_FILENO 0
-#define STDOUT_FILENO 1
 
 /* ----------------------------------------------- */
 
@@ -197,7 +192,7 @@ struct thread {
   /* 모든 쓰레드를 관리하는 all_thread_list를 위한 elem */;
   struct list_elem all_thread_elem;
 
-  /* --------------- added for PRJECT.2-1  --------------- */
+  /* --------------- added for PRJECT.2-2  --------------- */
 
   int exit_status;         /* 쓰레드의 종료 상태 */
   int success_load_status; /* load 성공 여부 */
@@ -207,14 +202,13 @@ struct thread {
   int next_fd;       /* 테이블에 등록된 fd + 1
                            즉, 다음에 저장될 fd의 값을 의미한다 */
 
-  struct semaphore exec_lock; /* exec의 성공 여부를 기다리는 lock */
-  struct semaphore exit_lock; /* 자식 쓰레드의 종료를 기다리는 lock */
+  struct semaphore load_sema;
+  struct semaphore exit_sema;
 
   /* For Process hierarchy */
   struct list child_list;      /* 자식 쓰레드들을 관리하는 list */
   struct list_elem child_elem; /* 자식 쓰레드들을 관리하는 list_elem */
-
-  struct thread *parent; /* 부모 쓰레드 */
+  struct thread *parent;       /* 부모 쓰레드 */
 
   /* ----------------------------------------------------- */
 

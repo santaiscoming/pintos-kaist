@@ -1,8 +1,8 @@
 #include "threads/thread.h"
 #include <debug.h>
+#include <include/lib/stdio.h> /* added for PROJECT.2-2 (var STD)*/
 #include <random.h>
 #include <stddef.h>
-#include <stdio.h>
 #include <string.h>
 #include "intrinsic.h"
 #include "threads/flags.h"

@@ -3,13 +3,13 @@
 #include <syscall-nr.h>
 #include "filesys/filesys.h" /* added for PROJECT.2-2 */
 #include "intrinsic.h"
-#include "process.h" /* added for PROJECT.2-2 */
-#include "synch.h"   /* added for PROJECT.2-2 */
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/loader.h"
+#include "threads/synch.h" /* added for PROJECT.2-2 */
 #include "threads/thread.h"
 #include "userprog/gdt.h"
+#include "userprog/process.h" /* added for PROJECT.2-2 */
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -55,7 +55,6 @@ void syscall_init(void) {
  * @details passing arguments register
  *          %rdi(1st), %rsi(2nd), %rdx(3rd), %r10(4th), %r8(5th), %r9(6th)
 */
-
 void syscall_handler(struct intr_frame *f UNUSED) {
   /* --------------- added for PROJECT.2-2 --------------- */
 
@@ -83,40 +82,40 @@ void syscall_handler(struct intr_frame *f UNUSED) {
       //   break;
 
     case SYS_CREATE: /* const char *file, unsigned initial_size */
-      create(f->R.rdi, f->R.rsi);
+      create((char *)(f->R.rdi), f->R.rsi);
       break;
 
     case SYS_REMOVE: /* const char *file */
-      remove(f->R.rdi);
+      remove((char *)(f->R.rdi));
       break;
 
     case SYS_OPEN: /* const char *file */
-      open(f->R.rdi);
+      open((char *)(f->R.rdi));
       break;
 
-      // case SYS_FILESIZE: /* int fd */
-      //   filesize(f->R.rdi);
-      //   break;
+    case SYS_FILESIZE: /* int fd */
+      filesize(f->R.rdi);
+      break;
 
-      // case SYS_READ: /* int fd, void *buffer, unsigned length */
-      //   read(f->R.rdi, f->R.rsi, f->R.rdx);
-      //   break;
+    case SYS_READ: /* int fd, void *buffer, unsigned length */
+      read(f->R.rdi, (void *)(f->R.rsi), f->R.rdx);
+      break;
 
-      // case SYS_WRITE: /* int fd, const void *buffer, unsigned length */
-      //   write(f->R.rdi, f->R.rsi, f->R.rdx);
-      //   break;
+    case SYS_WRITE: /* int fd, const void *buffer, unsigned length */
+      write(f->R.rdi, (void *)(f->R.rsi), f->R.rdx);
+      break;
 
-      // case SYS_SEEK: /* int fd, unsigned position */
-      //   seek(f->R.rdi, f->R.rsi);
-      //   break;
+    case SYS_SEEK: /* int fd, unsigned position */
+      seek(f->R.rdi, f->R.rsi);
+      break;
 
-      // case SYS_TELL: /* int fd */
-      //   tell(f->R.rdi);
-      //   break;
+    case SYS_TELL: /* int fd */
+      tell(f->R.rdi);
+      break;
 
-      // case SYS_CLOSE: /* int fd */
-      //   close(f->R.rdi);
-      //   break;
+    case SYS_CLOSE: /* int fd */
+      close(f->R.rdi);
+      break;
 
       // case SYS_DUP2: /* int oldfd, int newfd */
       //   dup2(f->R.rdi, f->R.rsi);
@@ -128,11 +127,8 @@ void syscall_handler(struct intr_frame *f UNUSED) {
   }
 
   /* --------------- before PROJECT.2-2 --------------- 
-  printf("system call!\n"); */
-
-  /* ----------------------------------------------------- */
-
-  thread_exit();
+  printf("system call!\n"); 
+  thread_exit(); */
 }
 
 /* --------------- added for PROJECT.2-2 --------------- */
@@ -144,9 +140,11 @@ void syscall_handler(struct intr_frame *f UNUSED) {
  * @param addr pointer address
 */
 void check_user_address(const void *addr) {
-  if (is_kernel_vaddr(addr) || !addr) {
+  struct thread *curr_t = thread_current();
+
+  if (is_kernel_vaddr(addr) || addr == NULL ||
+      pml4_get_page(curr_t->pml4, addr) == NULL)
     exit(-1);
-  }
 }
 
 /**
@@ -216,6 +214,11 @@ int open(const char *file) {
 
   fd = process_add_file(file_p);
 
+  if (fd == -1) {
+    exit(-1);
+    return;
+  }
+
   return fd;
 }
 
@@ -226,10 +229,12 @@ int open(const char *file) {
 */
 int filesize(int fd) {
   struct thread *curr = thread_current();
+  struct file *file_p;
 
-  if (fd < 0 || fd >= curr->next_fd) return -1;
+  ASSERT(fd < curr->next_fd);
+  ASSERT(fd >= 0);
 
-  struct file *file_p = process_get_file(fd);
+  curr = file_p = process_get_file(fd);
 
   if (!file_p) return -1;
 
@@ -275,7 +280,9 @@ int read(int fd, void *buffer, unsigned length) {
 
   /* exception handling */
   check_user_address(buffer);
-  if (fd < 0 || curr->next_fd <= fd) return -1;
+
+  ASSERT(fd < curr->next_fd);
+  ASSERT(fd >= 0);
 
   lock_acquire(&filesys_lock); /* read()시에 동기화 문제를 위한 lock */
 
@@ -334,7 +341,9 @@ int write(int fd, const void *buffer, unsigned length) {
 
   /* exception handling */
   check_user_address(buffer);
-  if (fd < 0 || curr->next_fd <= fd) return -1;
+
+  ASSERT(fd < curr->next_fd);
+  ASSERT(fd >= 0);
 
   lock_acquire(&filesys_lock); /* write()시에 동기화 문제를 위한 lock */
 
@@ -354,7 +363,68 @@ int write(int fd, const void *buffer, unsigned length) {
 
   lock_release(&filesys_lock); /* write()시에 동기화 문제를 위한 lock 해제 */
 
+  curr->tf.R.rax = write_bytes;
+
   return write_bytes;
+}
+
+/**
+ * 
+*/
+void close(int fd) {
+  struct thread *curr = thread_current();
+  struct file *file;
+
+  /* fdt를 64까지 한바퀴 돌고나서 중간에 삭제해 비어있는 곳에
+     next_fd가 가르킨다면..?
+     즉, 30인 fd를 삭제해서 next_fd가 30인데 60번째 등록된걸 삭제하고싶은경우 */
+  // ASSERT(fd < curr->next_fd);
+  ASSERT(fd >= 2);
+
+  file = process_get_file(fd);
+
+  if (!file) return;
+
+  process_close_file(fd);
+}
+
+/**
+ * @brief open된 file(fd)의 읽기, 쓰기 위치를 position으로 이동한다.
+ * 
+ * @param fd file descriptor
+ * @param position 이동할 위치
+*/
+void seek(int fd, unsigned position) {
+  struct thread *curr = thread_current();
+  struct file *file;
+
+  ASSERT(fd < curr->next_fd);
+  ASSERT(fd >= 2);
+
+  file = process_get_file(fd);
+
+  if (!file) return;
+
+  file_seek(file, position);
+}
+
+unsigned tell(int fd) {
+  struct thread *curr = thread_current();
+  struct file *file;
+  off_t position;
+
+  ASSERT(fd < curr->next_fd);
+  ASSERT(fd >= 2);
+
+  file = process_get_file(fd);
+
+  if (!file) return -1;
+
+  position = file_tell(file);
+
+  if (position < 0) return -1;
+
+  return position;
 }
 
 /* ----------------------------------------------------- */
