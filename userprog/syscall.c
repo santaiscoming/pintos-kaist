@@ -231,7 +231,7 @@ int filesize(int fd) {
   struct thread *curr = thread_current();
   struct file *file_p;
 
-  ASSERT(fd < curr->next_fd);
+  // ASSERT(fd < curr->next_fd);
   ASSERT(fd >= 0);
 
   curr = file_p = process_get_file(fd);
@@ -281,7 +281,7 @@ int read(int fd, void *buffer, unsigned length) {
   /* exception handling */
   check_user_address(buffer);
 
-  ASSERT(fd < curr->next_fd);
+  // ASSERT(fd < curr->next_fd);
   ASSERT(fd >= 0);
 
   lock_acquire(&filesys_lock); /* read()시에 동기화 문제를 위한 lock */
@@ -342,7 +342,8 @@ int write(int fd, const void *buffer, unsigned length) {
   /* exception handling */
   check_user_address(buffer);
 
-  ASSERT(fd < curr->next_fd);
+  /* ✅ TODO 
+     ASSERT(fd < curr->next_fd); */
   ASSERT(fd >= 0);
 
   lock_acquire(&filesys_lock); /* write()시에 동기화 문제를 위한 lock */
@@ -398,7 +399,7 @@ void seek(int fd, unsigned position) {
   struct thread *curr = thread_current();
   struct file *file;
 
-  ASSERT(fd < curr->next_fd);
+  // ASSERT(fd < curr->next_fd);
   ASSERT(fd >= 2);
 
   file = process_get_file(fd);
@@ -413,7 +414,7 @@ unsigned tell(int fd) {
   struct file *file;
   off_t position;
 
-  ASSERT(fd < curr->next_fd);
+  // ASSERT(fd < curr->next_fd);
   ASSERT(fd >= 2);
 
   file = process_get_file(fd);
