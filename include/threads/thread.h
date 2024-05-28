@@ -96,7 +96,11 @@ extern int load_avg;
 #define DIV_FP(x, y) (((int64_t)x) * F / y)
 #define DIV_FP_AND_INT(x, n) (x / n)
 
-/* ----------------------------------------------- */
+/* ----------- added for PROJECT.2-2 (bad-access) ----------- */
+
+#define DUMMY "DUMMY"
+
+/* ---------------------------------------------------------- */
 
 /* A kernel thread or user process.
  *
@@ -202,13 +206,13 @@ struct thread {
   int next_fd;       /* 테이블에 등록된 fd + 1
                            즉, 다음에 저장될 fd의 값을 의미한다 */
 
-  struct semaphore load_sema;
   struct semaphore exit_sema;
+  struct semaphore load_sema;
 
   /* For Process hierarchy */
   struct list child_list;      /* 자식 쓰레드들을 관리하는 list */
   struct list_elem child_elem; /* 자식 쓰레드들을 관리하는 list_elem */
-  struct thread *parent;       /* 부모 쓰레드 */
+  struct thread *parent_t;     /* 부모 쓰레드 */
 
   /* ----------------------------------------------------- */
 
