@@ -476,7 +476,32 @@ power_off (void) {
 
 fd table을 정적할당 하려고 했다. 하지만 정적할당한 페이지는 프로그램 시작부터 끝까지 진행될 터이고프로세스가 종료되면 수거할 수 있는 동적할당이 낫다고 판단했다.
 
-`malloc`을 사용해도 가능했고 `palloc`을 사용해도 가능했지만 OS 특성상 page 단위로 메모리를 관리하기에 `palloc`을 사용했다.
+`malloc`을 사용해도 가능했고` `palloc`을 사용해도 가능했지만 OS 특성상 page 단위로 메모리를 관리하기에 `palloc`을 사용했다.
+
+#### fdt를 초기화할때 어디서 할 것인가 ?
+
+`thread_init()`에서 해주려 했지만 생각해보니 `init()`이란건 `thread`가 언제든 초기화할때 사용할 수 있는 함수라 생각했다
+
+그렇다면 fdt는 `thread_init()`을 실행할따마다 할당하게되고 메모리 누수가 발생할것이다.
+
+그렇다면 생성시점에 단 한번만 실행되는 함수를 찾아야했다
+
+그렇게해서 찾은것이 `thread_create()` 이다.
+
+`thread_create()`는 쓰레드가 생성할때 단 한번만 실행되므로
+
+#### fdt[0]과 fdt[1]은 어째서 0과 1을 넣어주는것일까
+
+이는 단순히 **dummy** 값이다. 다른 fd와 달리 file을 사용하는게 아니라 `input_getc()`와 `putbuf()`를 사용하기에 의미없는 `file`인 0과 1을 넣어준것이다.
+
+#### fork에 if를 넘겨줄떄 struct fork_frame 이라는 구조체를 만들어 넘기려했다.
+
+```c
+struct fork_frame {
+  struct intr_frame if_;
+  struct thread *parent;
+};
+```
 
 ### 커널
 
@@ -503,3 +528,13 @@ fd table을 정적할당 하려고 했다. 하지만 정적할당한 페이지�
 다시말해, 우리가 지금까지 게임, 타자연습, vscode, 터미널 등등을 사용할때 키보드로 입력을 받아오는것이 `read()` 시스템콜이었다. ㅁㅊㄷ
 
 또한 입력들이 화면이나 터미널, vscode로 출력되는것이 `write()` 시스템콜을 호출했을때 `fd == 1`이다. ㅁㅊㄷ
+
+#### 테스트 실행방법
+
+```bash
+pintos -v -k -T 60 -m 20   --fs-disk=10 -p tests/userprog/create-null:create-null -- -q   -f run create-null
+```
+
+```bash
+make tests/userprog/close-bad-fd.result VERBOSE=1
+```
