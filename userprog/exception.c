@@ -133,16 +133,16 @@ static void page_fault(struct intr_frame *f) {
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  /* ----------- added for PROJECT.2-2 (bad-access) ----------- */
+/* ----------- added for PROJECT.2-2 (bad-access) ----------- */
 
-  /* 일부 테스트는 커널이 불량 프로세스를 제대로 처리하는지 확인합니다. 
+/* 일부 테스트는 커널이 불량 프로세스를 제대로 처리하는지 확인합니다. 
 		 테스트를 위해 print를 해야하기에 exit(-1)을 추가합니다.
 		 (from : pintos-kaist ppt page.62)
 		 
 		 also, process might have tried to access unmapped memory
 		 like : PROJECT.2 test case : bad-{subject} 😡 */
 #ifdef USERPROG
-  exit(-1);
+  do_exit(-1);
 #endif
 
   /* ---------------------------------------------------------- */
