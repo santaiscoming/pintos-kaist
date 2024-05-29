@@ -174,14 +174,14 @@ void process_close_file(int fd) {
  * @return struct thread* child process
 */
 struct thread *get_child_process(int pid) {
-  struct thread *t = thread_current();
-  struct list_elem *e;
+  struct thread *curr = thread_current();
+  struct thread *t;
 
-  for (e = list_begin(&t->child_list); e != list_end(&t->child_list);
-       e = list_next(e)) {
-    struct thread *child = list_entry(e, struct thread, child_elem);
+  for (struct list_elem *e = list_begin(&curr->child_list);
+       e != list_end(&curr->child_list); e = list_next(e)) {
+    t = list_entry(e, struct thread, child_elem);
 
-    if (pid == child->tid) return child;
+    if (pid == t->tid) return t;
   }
 
   return NULL;
@@ -268,6 +268,11 @@ static void initd(void *f_name) {
   NOT_REACHED();
 }
 
+struct fork_frame {
+  struct intr_frame if_;
+  struct thread *parent;
+};
+
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
 /**
@@ -282,8 +287,41 @@ static void initd(void *f_name) {
  *       thread id, or TID_ERROR if the thread cannot be created.
 */
 tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED) {
-  /* Clone current thread to new thread.*/
-  return thread_create(name, PRI_DEFAULT, __do_fork, thread_current());
+  /*
+  struct fork_frame {
+    struct intr_frame *if_;
+    struct thread *parent;
+  };
+  */
+  struct fork_frame parent_frame;
+  parent_frame.parent = thread_current();
+  memcpy(&parent_frame.if_, if_, sizeof(struct intr_frame));
+
+  tid_t child_tid;
+
+  // printf("@@@@ 1\n");
+
+  child_tid = thread_create(name, PRI_DEFAULT, __do_fork, &parent_frame);
+
+  // printf("@@@@ 2\n");
+
+  if (child_tid == TID_ERROR) {
+    return TID_ERROR;
+  }
+  // printf("3\n");
+
+  struct thread *child_t = get_child_process(child_tid);
+  if (!child_t) return TID_ERROR;
+  // printf("before fork sema \n");
+
+  sema_down(&child_t->fork_sema);
+
+  // printf("after fork sema \n");
+
+  if (child_tid == TID_ERROR) return TID_ERROR;
+  if (child_t->exit_status == TID_ERROR) return TID_ERROR;
+
+  return child_tid;
 }
 
 #ifndef VM
@@ -297,21 +335,28 @@ static bool duplicate_pte(uint64_t *pte, void *va, void *aux) {
   bool writable;
 
   /* 1. TODO: If the parent_page is kernel page, then return immediately. */
+  if (is_kernel_vaddr(va)) return true;
 
   /* 2. Resolve VA from the parent's page map level 4. */
   parent_page = pml4_get_page(parent->pml4, va);
 
   /* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+  newpage = palloc_get_page(PAL_USER | PAL_ZERO);
+  if (newpage == NULL) return false;
 
   /* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+  memcpy(newpage, parent_page, PGSIZE);
+  writable = is_writable(pte);
 
   /* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
   if (!pml4_set_page(current->pml4, va, newpage, writable)) {
     /* 6. TODO: if fail to insert page, do error handling. */
+    palloc_free_page(newpage);
+    return false;
   }
   return true;
 }
@@ -334,21 +379,33 @@ static bool duplicate_pte(uint64_t *pte, void *va, void *aux) {
  *       >  즉, process_fork()의 두 번째 인수를 이 함수에 전달해야합니다.
 */
 static void __do_fork(void *aux) {
+  struct fork_frame *fork_frame = (struct fork_frame *)aux;
   struct intr_frame if_;
-  struct thread *parent = (struct thread *)aux;
+  struct thread *parent = fork_frame->parent;
   struct thread *current = thread_current();
+  struct intr_frame *parent_if = &fork_frame->if_;
   /* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-  struct intr_frame *parent_if;
   bool succ = true;
+
+  // printf("__do_fork parent_if rip : %p\n", parent_if->rip);
+  // printf("__do_fork parent * of _if rip : %p\n", parent->tf.rip);
+  // printf("do fork 1\n");
 
   /* 1. Read the cpu context to local stack. */
   memcpy(&if_, parent_if, sizeof(struct intr_frame));
+  if_.R.rax = 0;
+
+  // printf("if_ rip : %p\n", if_.rip);
+  // printf("do fork 2\n");
+  // printf("parent tid : %d\n", parent->tid);
+  // printf("curr_t tid : %d\n", current->tid);
 
   /* 2. Duplicate PT
       - 자식프로세스의 page table을 생성하고
       - 부모의 page table을 복사한다 ref.1) */
   current->pml4 = pml4_create();
   if (current->pml4 == NULL) goto error;
+  // printf("do fork 3\n");
 
   process_activate(current);
 #ifdef VM
@@ -363,29 +420,61 @@ static void __do_fork(void *aux) {
 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
-	 * TODO:       the resources of parent.*/
+	 * TODO:       the resources of parent.
+   * 
+   * >  여기서부터 code 를 작성합니다.
+   * >  file object를 복제하려면 include/filesys/file.h에있는 `file_duplicate`를
+   * >  사용하세요. NOTE : 부모는 이 함수가 성공적으로 부모의 리소스를 복제 할 때까지
+   * >  fork()에서 반환해서는 안됩니다.
+   * */
 
   /* ----------- added for PROJECT.2-2 (fork) ----------- */
-  // curr_t->next_fd = parent_t->next_fd;
+  // printf("do fork 4\n");
 
-  // for (size_t i = 3; i < parent_t->next_fd; i++) {
-  //   if (!(parent->fdt[i])) continue;
+  current->next_fd = parent->next_fd;
 
-  //   curr_t->fdt[i] = file_duplicate(parent_t->fdt[i]);
-  // }
+  // printf("parent name : %s\n", parent->name);
+  // printf("parent tid : %d\n", parent->tid);
+  // printf("parent next_fd : %d\n", parent->next_fd);
 
-  // sema_up(&curr_t->fork_sema);
+  current->fdt[0] = parent->fdt[0];
+  current->fdt[1] = parent->fdt[1];
+  for (size_t i = 2; i < 64; i++) {
+    // for (size_t i = 2; i < parent->next_fd; i++) {
+    // printf("i : %d\n", i);
+    if (!(parent->fdt[i])) {
+      // printf("없어 i : %d\n", i);
+      continue;
+    }
+
+    current->fdt[i] = file_duplicate(parent->fdt[i]);
+  }
 
   /* ---------------------------------------------------- */
+  // ✅ 이 sema_up이 시작할때 fork sema인지 확인
+  // printf("do fork 5\n");
+  // printf("do fork 6\n");
 
   /* process를 초기화한다. */
+  if_.R.rax = 0;
   process_init();
+
+  // printf("do fork 7\n");
 
   /* Finally, switch to the newly created process. 
      모든 리소스 복사가 성공하면 child process로 context switching */
-  if (succ) do_iret(&if_);
+  if (succ) {
+    // if_.R.rax = 0;
+    // sema_up(&current->fork_sema);
+    // printf("성공 ! \n");
+
+    do_iret(&if_);
+    sema_up(&current->fork_sema);
+  }
 
 error:
+  sema_up(&current->fork_sema);
+  printf("do fork error\n");
   thread_exit();
 }
 
@@ -480,17 +569,26 @@ int process_wait(tid_t child_tid UNUSED) {
 
   struct thread *child_t = get_child_process(child_tid);
 
+  // printf("child_t : %p\n", child_t);
+  // printf("child id : %d\n", child_t->tid);
   if (!child_t) return -1;
-
+  // printf("before sema down load \n");
   sema_down(&child_t->load_sema);
+
+  // printf("after sema down load \n");
 
   int status = child_t->exit_status;
 
-  remove_child_process(child_t);
+  // remove_child_process(child_t);
+  list_remove(&child_t->child_elem);
 
+  // printf("sema down LOAD after\n");
   /* 자식을 remove 할때까지 살려두기 위함
      process_exit()의 마지막에 sema_down(curr_t->exit_sema) */
+  // printf("before sema up exit \n");
   sema_up(&child_t->exit_sema);
+
+  // printf("after sema up exit \n");
 
   return status;
 
@@ -511,26 +609,33 @@ void process_exit(void) {
   struct thread *curr_t = thread_current();
 
   /* --------------- added for PROJECT.2-2 --------------- */
-
+  // printf("exit 1 \n");
   struct file *file;
+  // printf("exit 2 \n");
 
   for (int fd = 0; fd < curr_t->next_fd; fd++) {
-    close(fd); /* close_file() && FDT[fd] init */
+    do_close(fd); /* close_file() && FDT[fd] init */
   }
+  // printf("exit 3 \n");
 
-  palloc_free_page(curr_t->fdt); /* deallocate FDT */
+  // palloc_free_page(curr_t->fdt); /* deallocate FDT */
+  palloc_free_page(curr_t->fdt);
+  // printf("exit 4 \n");
 
-  /* ----------------------------------------------------- */
+  /* -----------------------------------\------------------ */
+  // printf("exit 5 \n");
 
   process_cleanup();
-
-  /* --------------- added for PROJECT.2-2 --------------- */
+  // printf("exit 6 \n");
 
   sema_up(&curr_t->load_sema);
 
-  sema_down(&curr_t->exit_sema);
-}
+  /* --------------- added for PROJECT.2-2 --------------- */
+  // printf("exit 7 \n");
 
+  sema_down(&curr_t->exit_sema);
+  // printf("exit 8 \n");
+}
 /**
  * @brief 현재 프로세스의 자원을 해제(free)한다.
  * 

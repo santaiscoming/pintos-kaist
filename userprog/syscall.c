@@ -3,6 +3,7 @@
 #include <syscall-nr.h>
 #include "filesys/filesys.h" /* added for PROJECT.2-2 */
 #include "intrinsic.h"
+#include "lib/user/syscall.h" /* added for PROJECT.2-2 pid_t */
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/loader.h"
@@ -56,53 +57,54 @@ void syscall_init(void) {
  *          %rdi(1st), %rsi(2nd), %rdx(3rd), %r10(4th), %r8(5th), %r9(6th)
 */
 void syscall_handler(struct intr_frame *f UNUSED) {
+
   /* --------------- added for PROJECT.2-2 --------------- */
 
   int syscall_num = f->R.rax;
 
   switch (syscall_num) {
     case SYS_HALT:
-      halt();
+      do_halt();
       break;
 
     case SYS_EXIT: /* int status */
-      exit((int)(f->R.rdi));
+      do_exit((int)(f->R.rdi));
       break;
 
-      // case SYS_FORK: /* const char *thread_name */
-      //   fork(f->R.rdi);
-      //   break;
+    case SYS_FORK: /* const char *thread_name */
+      f->R.rax = do_fork(f->R.rdi);
+      break;
 
-      // case SYS_EXEC: /* const char *file */
-      //   exec(f->R.rdi);
-      //   break;
+    case SYS_EXEC: /* const char *file */
+      f->R.rax = do_exec(f->R.rdi);
+      break;
 
-      // case SYS_WAIT: /* pid_t */
-      //   wait(f->R.rdi);
-      //   break;
+    case SYS_WAIT: /* pid_t */
+      f->R.rax = do_wait(f->R.rdi);
+      break;
 
     case SYS_CREATE: /* const char *file, unsigned initial_size */
-      f->R.rax = create((char *)(f->R.rdi), f->R.rsi);
+      f->R.rax = do_create((char *)(f->R.rdi), f->R.rsi);
       break;
 
     case SYS_REMOVE: /* const char *file */
-      f->R.rax = remove((char *)(f->R.rdi));
+      f->R.rax = do_remove((char *)(f->R.rdi));
       break;
 
     case SYS_OPEN: /* const char *file */
-      f->R.rax = open((char *)(f->R.rdi));
+      f->R.rax = do_open((char *)(f->R.rdi));
       break;
 
     case SYS_FILESIZE: /* int fd */
-      f->R.rax = filesize(f->R.rdi);
+      f->R.rax = do_filesize(f->R.rdi);
       break;
 
     case SYS_READ: /* int fd, void *buffer, unsigned length */
-      f->R.rax = read(f->R.rdi, (void *)(f->R.rsi), f->R.rdx);
+      f->R.rax = do_read(f->R.rdi, (void *)(f->R.rsi), f->R.rdx);
       break;
 
     case SYS_WRITE: /* int fd, const void *buffer, unsigned length */
-      f->R.rax = write(f->R.rdi, (void *)(f->R.rsi), f->R.rdx);
+      f->R.rax = do_write(f->R.rdi, (void *)(f->R.rsi), f->R.rdx);
       break;
 
     case SYS_SEEK: /* int fd, unsigned position */
@@ -110,11 +112,11 @@ void syscall_handler(struct intr_frame *f UNUSED) {
       break;
 
     case SYS_TELL: /* int fd */
-      f->R.rax = tell(f->R.rdi);
+      f->R.rax = do_tell(f->R.rdi);
       break;
 
     case SYS_CLOSE: /* int fd */
-      close(f->R.rdi);
+      do_close(f->R.rdi);
       break;
 
       // case SYS_DUP2: /* int oldfd, int newfd */
@@ -122,7 +124,7 @@ void syscall_handler(struct intr_frame *f UNUSED) {
       //   break;
 
     default: /* undefined syscall */
-      exit(-1);
+      do_exit(-1);
       break;
   }
 
@@ -139,20 +141,20 @@ void syscall_handler(struct intr_frame *f UNUSED) {
  * 
  * @param addr pointer address
 */
-void check_user_address(const void *addr) {
+void validate_adress(const void *addr) {
   struct thread *curr_t = thread_current();
 
-  if (is_kernel_vaddr(addr)) exit(-1);
+  if (is_kernel_vaddr(addr)) do_exit(-1);
 
-  if (addr == NULL || !is_user_vaddr(addr)) exit(-1);
+  if (addr == NULL || !is_user_vaddr(addr)) do_exit(-1);
 
-  if (pml4_get_page(curr_t->pml4, addr) == NULL) exit(-1);
+  if (pml4_get_page(curr_t->pml4, addr) == NULL) do_exit(-1);
 }
 
 /**
  * @brief pintOS를 종료한다.
 */
-void halt(void) { power_off(); }
+void do_halt(void) { power_off(); }
 
 /**
  * @brief current Process를 종료한다.
@@ -161,7 +163,7 @@ void halt(void) { power_off(); }
  * 
  * @details process 정상종료 ? status = 0 : status = -1
 */
-void exit(int status) {
+void do_exit(int status) {
   struct thread *cur = thread_current();
 
   cur->exit_status = status;
@@ -179,10 +181,10 @@ void exit(int status) {
  * 
  * @return bool 파일 생성 성공 여부
 */
-bool create(const char *file, unsigned initial_size) {
+bool do_create(const char *file, unsigned initial_size) {
   bool success;
 
-  check_user_address(file);
+  validate_adress(file);
 
   success = filesys_create(file, initial_size);
 
@@ -197,8 +199,8 @@ bool create(const char *file, unsigned initial_size) {
  * 
  * @return bool 파일 삭제 성공 여부
 */
-bool remove(const char *file) {
-  check_user_address(file);
+bool do_remove(const char *file) {
+  validate_adress(file);
 
   return filesys_remove(file);
 }
@@ -208,8 +210,8 @@ bool remove(const char *file) {
  * 
  * @param file open할 file의 이름 및 경로 정보
 */
-int open(const char *file) {
-  check_user_address(file);
+int do_open(const char *file) {
+  validate_adress(file);
 
   struct file *new_file = filesys_open(file);
 
@@ -227,7 +229,7 @@ int open(const char *file) {
  * 
  * @param fd file descriptor
 */
-int filesize(int fd) {
+int do_filesize(int fd) {
   struct thread *curr = thread_current();
   struct file *file_p;
 
@@ -273,13 +275,13 @@ int filesize(int fd) {
  *          file_read() : Reads SIZE bytes from FILE into BUFFER,
  *          즉, file에서 length만큼 읽어서 buffer(user가 볼 수 있는)에 저장한다.
 */
-int read(int fd, void *buffer, unsigned length) {
+int do_read(int fd, void *buffer, unsigned length) {
   struct thread *curr = thread_current();
   struct file *file_p;
   size_t read_bytes = 0;
 
   /* exception handling */
-  check_user_address(buffer);
+  validate_adress(buffer);
 
   // ASSERT(fd < curr->next_fd);
   // ASSERT(fd >= 0);
@@ -349,13 +351,13 @@ int read(int fd, void *buffer, unsigned length) {
  * 
  *          putbuf() : buffer에 있는 데이터를 length만큼 console에 출력한다.
 */
-int write(int fd, const void *buffer, unsigned length) {
+int do_write(int fd, const void *buffer, unsigned length) {
   struct thread *curr = thread_current();
   struct file *file_p;
   int write_bytes = 0;
 
   /* exception handling */
-  check_user_address(buffer);
+  validate_adress(buffer);
 
   lock_acquire(&filesys_lock); /* write()시에 동기화 문제를 위한 lock */
 
@@ -364,12 +366,12 @@ int write(int fd, const void *buffer, unsigned length) {
   // ASSERT(fd >= 0);
   if (fd < 0 || fd > curr->next_fd) {
     lock_release(&filesys_lock);
-    exit(-1);
+    do_exit(-1);
   }
 
   if (fd == 0) {
     lock_release(&filesys_lock);
-    exit(-1);
+    do_exit(-1);
   }
 
   /* (fd == 1) 즉, 표준 출력으로 출력하는 경우 */
@@ -394,7 +396,7 @@ int write(int fd, const void *buffer, unsigned length) {
 /**
  * 
 */
-void close(int fd) {
+void do_close(int fd) {
   struct thread *curr = thread_current();
   struct file *file;
 
@@ -433,7 +435,7 @@ void seek(int fd, unsigned position) {
   file_seek(file, position);
 }
 
-unsigned tell(int fd) {
+unsigned do_tell(int fd) {
   struct thread *curr = thread_current();
   struct file *file;
   off_t position;
@@ -452,26 +454,35 @@ unsigned tell(int fd) {
   return position;
 }
 
-// tid_t fork(const char *thread_name) {
-//   // struct intr_frame *
+pid_t do_fork(const char *thread_name) {
+  validate_adress(thread_name);
 
-//   return process_fork(thread_name);
-// }
+  struct thread *parent_t = thread_current();
+  printf("@@@ sys fork \n");
 
-// int exec(const char *cmd_line) {
-//   char *fn_copy;
+  struct intr_frame copy_parent_tf;  // 로컬 변수로 intr_frame을 선언
+  memcpy(&copy_parent_tf, &parent_t->tf, sizeof(struct intr_frame));
 
-//   check_user_address(cmd_line);
+  return process_fork(thread_name, &copy_parent_tf);
+}
 
-//   fn_copy = palloc_get_page(0);
-//   if (fn_copy == NULL) return TID_ERROR;
-//   strlcpy(fn_copy, cmd_line, PGSIZE);
+int do_exec(const char *cmd_line) {
+  char *fn_copy;
 
-//   printf("cmd line : %s", cmd_line);
+  validate_adress(cmd_line);
 
-//   if (process_exec(fn_copy) == -1) {
-//     return -1;
-//   }
-// }
+  fn_copy = palloc_get_page(0);
+  if (fn_copy == NULL) return TID_ERROR;
+  strlcpy(fn_copy, cmd_line, PGSIZE);
+
+  if (process_exec(fn_copy) == -1) {
+    return -1;
+  }
+}
+
+int do_wait(pid_t pid) {
+  printf("wait 호출 \n");
+  return process_wait(pid);
+}
 
 /* ----------------------------------------------------- */
