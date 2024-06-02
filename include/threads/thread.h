@@ -99,6 +99,7 @@ extern int load_avg;
 /* ----------- added for PROJECT.2-2 (bad-access) ----------- */
 
 #define DUMMY "DUMMY"
+#define FDT_MAX 128
 
 /* ---------------------------------------------------------- */
 
@@ -198,7 +199,7 @@ struct thread {
 
   /* --------------- added for PRJECT.2-2  --------------- */
 
-#ifdef USERPROG
+  // #ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint64_t *pml4; /* Page map level 4 */
 
@@ -206,9 +207,9 @@ struct thread {
   int success_load_status; /* load 성공 여부 */
 
   /* for file manipulation */
-  struct file **fdt; /* file descriptor table */
-  int next_fd;       /* 테이블에 등록된 fd + 1
-                           즉, 다음에 저장될 fd의 값을 의미한다 */
+  struct list fdt; /* file descriptor table */
+  int next_fd; /* 테이블에 등록된 fd + 1 즉, 다음에 저장될 fd의 값을 의미한다 */
+  struct file *running_file; /* 실행중인 파일 */
 
   struct semaphore exit_sema;
   struct semaphore load_sema;
@@ -218,7 +219,9 @@ struct thread {
   struct list child_list;      /* 자식 쓰레드들을 관리하는 list */
   struct list_elem child_elem; /* 자식 쓰레드들을 관리하는 list_elem */
   struct thread *parent_t;     /* 부모 쓰레드 */
-#endif
+  struct intr_frame parent_if; /* fork를 호출한 부모의 if 
+                                   (before context switch) */
+  // #endif
 
   /* ----------------------------------------------------- */
 
