@@ -199,7 +199,7 @@ struct thread {
 
   /* --------------- added for PRJECT.2-2  --------------- */
 
-  // #ifdef USERPROG
+#ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint64_t *pml4; /* Page map level 4 */
 
@@ -221,7 +221,7 @@ struct thread {
   struct thread *parent_t;     /* 부모 쓰레드 */
   struct intr_frame parent_if; /* fork를 호출한 부모의 if 
                                    (before context switch) */
-  // #endif
+#endif
 
   /* ----------------------------------------------------- */
 
