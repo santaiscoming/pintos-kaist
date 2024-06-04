@@ -711,8 +711,7 @@ static bool load(const char *file_name, struct intr_frame *if_) {
   off_t file_ofs;
   bool success = false;
   int i;
-  // printf("load 실행 1, tid : %d, name : %s \n", thread_current()->tid,
-  //        thread_current()->name);
+
   /* Allocate and activate page directory. */
   t->pml4 = pml4_create();
   if (t->pml4 == NULL) {
@@ -720,7 +719,6 @@ static bool load(const char *file_name, struct intr_frame *if_) {
     goto done;
   }
   process_activate(thread_current());
-  // printf("load 실행 2 \n");
 
   /* Open executable file. */
   file = filesys_open(file_name);
@@ -730,7 +728,6 @@ static bool load(const char *file_name, struct intr_frame *if_) {
   }
   t->running_file = file;
   file_deny_write(file);
-  // printf("load 실행 3 \n");
 
   /* 🟠 Read and verify executable header.
 		 1. file의 ELF헤더를 읽고 쓴다. file_read()
@@ -743,7 +740,6 @@ static bool load(const char *file_name, struct intr_frame *if_) {
     printf("load: %s: error loading executable\n", file_name);
     goto done;
   }
-  // printf("load 실행 3-2 \n");
 
   /* 🟠 Read program headers.
 		 1. file의 program 헤더를 읽고 쓴다. */
@@ -795,17 +791,14 @@ static bool load(const char *file_name, struct intr_frame *if_) {
         break;
     }
   }
-  // printf("load 실행 4 \n");
 
   /* 🟠 Set up stack.
 		 user stack을 초기화한다. 함수 내부에서 stack pointer의 시작점을 초기화한다. */
   if (!setup_stack(if_)) goto done;
-  // printf("load 실행 5 \n");
 
   /* Start address.
 		 프로그램의 시작점을 설정한다. 즉, 메모리에 로드되어 CPU가 어디부터 실행할지 알 수 있다 */
   if_->rip = ehdr.e_entry;
-  // printf("load 실행 6 \n");
 
   /* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html).
@@ -872,17 +865,28 @@ static bool install_page(void *upage, void *kpage, bool writable);
 /* Loads a segment starting at offset OFS in FILE at address
  * UPAGE.  In total, READ_BYTES + ZERO_BYTES bytes of virtual
  * memory are initialized, as follows:
+ * 
+ * >  FILE에서 OFS에서 시작하는 세그먼트를 UPAGE 주소에 로드합니다.
+ * >  총 READ_BYTES + ZERO_BYTES 바이트의 가상 메모리가 초기화됩니다.
+ * >  다음과 같이 :
  *
  * - READ_BYTES bytes at UPAGE must be read from FILE
  * starting at offset OFS.
- *
  * - ZERO_BYTES bytes at UPAGE + READ_BYTES must be zeroed.
+ * 
+ * >  UPAGE의 READ_BYTES 바이트는 OFS에서 시작하는 FILE에서 읽어야합니다.
+ * >  UPAGE + READ_BYTES의 ZERO_BYTES 바이트는 0으로 설정되어야합니다.
  *
  * The pages initialized by this function must be writable by the
  * user process if WRITABLE is true, read-only otherwise.
+ * 
+ * >  이 함수에 의해 초기화된 페이지는 WRITABLE이 true이면 사용자 프로세스에 의해
+ * >  쓰기 가능해야하며 그렇지 않으면 읽기 전용이어야합니다.
  *
  * Return true if successful, false if a memory allocation error
- * or disk read error occurs. */
+ * or disk read error occurs.
+ *  
+ * >  성공하면 true, 메모리 할당 오류 또는 디스크 읽기 오류가 발생하면 false를 반환합니다. */
 static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
                          uint32_t read_bytes, uint32_t zero_bytes,
                          bool writable) {
@@ -966,10 +970,42 @@ static bool install_page(void *upage, void *kpage, bool writable) {
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
+/**
+ * 
+*/
+
+/** TODO: Load the segment from the file 
+ *  TODO: This called when the first page fault occurs on address VA. 
+ *  TODO: VA is available when calling this function. 
+ * 
+ *  >  file에서 segment를 load하세요.
+ *  >  이 함수는 VA 주소에서 처음 page가 발생할 때 호출됩니다.
+ *  >  이 함수를 호출할 때 VA를 사용할 수 있습니다. 
+*/
 static bool lazy_load_segment(struct page *page, void *aux) {
-  /* TODO: Load the segment from the file */
-  /* TODO: This called when the first page fault occurs on address VA. */
-  /* TODO: VA is available when calling this function. */
+  void *physical_addr = page->frame->kva;
+  bool result = false;
+
+  struct file_segment_info *info = (struct file_segment_info *)aux;
+  struct file *file = info->file;
+  off_t offset = info->offset;
+  uint32_t read_bytes = info->read_bytes;
+  uint32_t zero_bytes = info->zero_bytes;
+
+  off_t page_read_bytes = file_read_at(file, physical_addr, read_bytes, offset);
+
+  if ((uint32_t)page_read_bytes != read_bytes) {
+    free(aux);
+    goto done;
+  }
+
+  memset(physical_addr + page_read_bytes, 0, zero_bytes);
+  result = true;
+
+  return result;
+
+done:
+  return result;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -996,12 +1032,24 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
   while (read_bytes > 0 || zero_bytes > 0) {
     /* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
-		 * and zero the final PAGE_ZERO_BYTES bytes. */
+		 * and zero the final PAGE_ZERO_BYTES bytes.
+     * 
+     * >  이 페이지를 어떻게 채울지 계산하십시오.
+     * >  FILE에서 PAGE_READ_BYTES 바이트를 읽을 것입니다.
+     * >  그리고 마지막 PAGE_ZERO_BYTES 바이트를 0으로 설정합니다.
+    */
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
     /* TODO: Set up aux to pass information to the lazy_load_segment. */
-    void *aux = NULL;
+    struct file_segment_info *aux = calloc(1, sizeof(struct file_segment_info));
+    if (aux == NULL) return false;
+
+    aux->file = file;
+    aux->read_bytes = page_read_bytes;
+    aux->zero_bytes = page_zero_bytes;
+    aux->offset = ofs;
+
     if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable,
                                         lazy_load_segment, aux))
       return false;
@@ -1010,6 +1058,7 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
     upage += PGSIZE;
+    ofs += page_read_bytes;
   }
   return true;
 }
@@ -1021,8 +1070,22 @@ static bool setup_stack(struct intr_frame *if_) {
 
   /* TODO: Map the stack on stack_bottom and claim the page immediately.
 	 * TODO: If success, set the rsp accordingly.
-	 * TODO: You should mark the page is stack. */
+	 * TODO: You should mark the page is stack. 
+   * 
+   * >  stack_bottom에 stack을 매핑하고 즉시 페이지를 요청하십시오.
+   * >  성공하면 rsp를 적절하게 설정하십시오.
+   * >  페이지가 stack임을 표시해야합니다.
+   */
   /* TODO: Your code goes here */
+
+  if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true)) {
+    if_->rsp = USER_STACK;
+    success = true;
+  }
+
+  if (vm_claim_page(stack_bottom)) {
+    success = true;
+  }
 
   return success;
 }
