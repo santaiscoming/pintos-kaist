@@ -1087,6 +1087,8 @@ static bool setup_stack(struct intr_frame *if_) {
     success = true;
   }
 
+  if_->rsp = USER_STACK;
+
   return success;
 }
 #endif /* VM */
