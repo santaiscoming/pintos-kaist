@@ -310,6 +310,32 @@ recent_cpu는 스케쥴링에 변하지않는다
 
 ## PROJECT 2-1 "PASSING ARGMENT"
 
+### STACK은 아래로 커진다의 의미
+
+```c
+void push_argment_stack(char *argv[], int argc, struct intr_frame *_if) {
+  int i, j;
+  int total_length = 0;
+  char *arg_addr[(LOADER_ARGS_LEN / 2) + 1];
+
+  /* 인수(args)를 스택에 저장한다. */
+  for (i = argc - 1; i >= 0; i--) {
+    _if->rsp -= strlen(argv[i]) + 1; /* null종단 문자를 추가 해야한다. */
+    memcpy(_if->rsp, argv[i], strlen(argv[i]) + 1);
+    arg_addr[i] = _if->rsp;
+    total_length += strlen(argv[i]) + 1;
+  }
+
+ // { ... more thing }
+}
+```
+
+위의 코드를 보면 user_stack에 argument를 넣는데 `rsp`를 감소시키는것을 볼 수 있다.
+
+일반적으로 메모리에 무언가를 push 한다면 memory는 증가하는 방향으로 push된다.
+
+그러나 stack은 누누히 설명해왔듯 아래로 커지기에 `rsp`를 감소시키는것이다.
+
 ### args
 
 command line의 길이는 128바이트로 제한되어있다. (GITBOOK)
@@ -403,7 +429,7 @@ system call!
 - `process_exit()` 내부 (when terminated thread(process 종료))
 
   - [x] close all files
-  - x] free file descriptor table
+  - [x] free file descriptor table
 
 - `file system call` 이 호출될때 **race condition**을 방지하기 위해 `global lock`을 사용한다.
 
@@ -537,4 +563,282 @@ pintos -v -k -T 60 -m 20   --fs-disk=10 -p tests/userprog/create-null:create-nul
 
 ```bash
 make tests/userprog/close-bad-fd.result VERBOSE=1
+```
+
+# PROJECT 3
+
+## memory management & lazy loading & anonymous page
+
+### 개념
+
+- **page**
+
+  - page란 메모리 가상메모리의 블럭 단위이다. page는 4KB로 고정되어있다.
+
+- **frame**
+
+  - frame은 물리메모리의 블럭 단위이다. frame은 4KB로 고정되어있다.
+
+### 현재 pintos의 문제
+
+#### 현재 pintos 메모리 관리 상황
+
+code segment와 Data 즉, file을 읽어와 `setup_stack()`을 통해 물리메모리를 할당하고 데이터를 load한다.
+
+#### vm 이후의 pintos
+
+허나 이제는 page_table을 미리 만들어놓고 필요할때만 물리메모리를 할당받아 데이터를 load하고 page table을 셋팅하는 방식으로 바꿔야한다.
+
+다시말해, page_table에 page만을 할당하고 물리메모리에는 할당하지 않은 상태이다.
+
+### 💡 발견
+
+### 구현목록
+
+- For virtual memory
+
+  - [x] `vm_{func}` 관련 함수 구현
+  - [x] `page_table` 구현
+
+- For lazy loading(demanding page)
+
+  - [x] `load_segment()` 수정
+  - [x] `page_fault_handler()` 수정
+  - [x] `lazy_load_segment` 수정
+
+- For anonymous page
+
+  - supplementary_page_table
+    - [x] `supplemental_page_table_copy()` 구현
+    - [x] `supplemental_page_table_kill()` 구현
+  - anon.c
+    - [x] `anon_destroy()` 구현
+  - uninit.c
+    - [x] `uninit_destroy()` 구현
+
+- validation
+  - 수정목록
+    - [x] `check_address()` 수정
+  - 구현목록
+    - [x] `check_valid_buffer()` 구현
+    - [ ] `check_valid_string()` 구현
+
+### 트러블슈팅
+
+`page_get_type()` 의 경우 `uninit_page`일때는 후추 claim될때 해당 파일의 타입으로 변경될 타입을 반환한다.
+
+즉, `VM_UNINIT`을 반환하는게 아니라 `VM_FILE`이나 `VM_ANON`을 반환한다.
+
+그렇기에 `page_get_type()`을 사용해 `VM_UNINIT` 타입이 `VM_ANON`으로 반환됐을때
+
+frame이 할당이 안됐기에 claim해줘야 했는데 실제 page type인 operation 타입을 확인하면 상관이 없어진다.
+
+```c
+bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
+                                  struct supplemental_page_table *src UNUSED) {
+  struct hash_iterator iterator;
+  struct page *parent_page, *child_page = NULL;
+  struct file_segment_info *src_aux, *dst_aux = NULL;
+  enum vm_type curr_page_type;
+  bool succ = false;
+
+  hash_first(&iterator, &src->page_table);
+
+  while (hash_next(&iterator)) {
+    parent_page = hash_entry(hash_cur(&iterator), struct page, spt_elem);
+    curr_page_type = page_get_type(parent_page);
+
+    switch (curr_page_type) {
+
+      case VM_UNINIT:
+        src_aux = (struct file_segment_info *)parent_page->uninit.aux;
+        dst_aux = (struct file_segment_info *)calloc(
+            1, sizeof(struct file_segment_info));
+        if (!dst_aux) goto err;
+
+        memcpy(dst_aux, src_aux, sizeof(struct file_segment_info));
+        dst_aux->file = file_duplicate(src_aux->file);
+        /* memcpy 오류시 다음과 같이 변경될 수 있음
+           dst_aux->read_bytes = src_aux->read_bytes;
+           dst_aux->offset = src_aux->offset;
+           dst_aux->zero_bytes = src_aux->zero_bytes; */
+
+        if (!vm_alloc_page_with_initializer(
+                page_get_type(parent_page), parent_page->va,
+                parent_page->writable, parent_page->uninit.init, dst_aux)) {
+
+          free(dst_aux);
+          goto err;
+        }
+        break;
+
+      case VM_ANON:
+        if (!vm_alloc_page(VM_ANON | VM_MARKER_0, parent_page->va,
+                           parent_page->writable)) {
+          goto err;
+        }
+        if (!vm_claim_page(parent_page->va)) goto err;
+
+        child_page = spt_find_page(dst, parent_page->va);
+        if (!child_page) goto err;
+
+        if (parent_page->frame == NULL) {
+          vm_do_claim_page(parent_page);
+        }
+
+        memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
+
+        break;
+        /* TODO : copy-on-write 구현한다면 부모의 kva를 자식의 va가 가르키도록 설정 */
+    }
+  }
+
+  succ = true;
+
+err:
+
+  return succ;
+}
+```
+
+## stack growth
+
+### 개념
+
+user stack은 user program이 실행될때 생성되는 stack이다.
+
+user program이 실행되면서 지역변수들을 stack에 넣게되는데
+
+이때 push 인스트럭션을 통해 user stack에 넣게된다.
+
+하지만 기본 할당받은 4kb의 user stack을 넘게되면 stack을 expanding 해줘야하는데
+
+이것이 stack growth이다.
+
+### 구현목록
+
+- [x] `stack_growth()` 구현
+- [x] `vm_try_handle_fault()` 수정
+
+### 트러블슈팅
+
+#### load_segment()에서 while문에 file의 va가 400000으로 5개 시작하는 이유
+
+load_segment를 했을떄 조각냈을떄 400000 으로 시작됐떤건 code 영역이기에 그렇다또한 args-none이 5page가 필요하기에 40000부터 40001000까지 할당되는데 1000차이가 나는건 16진수로 4kb 차이가 나기에 1page 차이가 나는것이다.
+
+> 1000이라는 16진수가 10진수로 4096인 이유 2^4 \* 16 = 4096
+
+4000000 4001000 4002000 4003000 ...
+
+뒤의 자리가 000인 이유는 offset이기 때문이다.
+
+code에 args.noen을 5page 짤라넣는것
+
+#### stack growth에서 rsp는 한번에 확 밀리는가
+
+함수의 호출이 일어날경우 rsp는 한번에 밀릴지 8바이트씩 밀릴지 궁금했다.
+
+test case중에 `pt-big-stk-obj`라는 테스트를 확인하면 65536바이트의 지역변수가 선언되어 있다.
+
+이를 확인해보니 8바이트씩 밀리면서 지역변수의 rsp를 밀어주는것이 아닌 65536바이트를 한번에 밀어주고 stack의 위로 올라가면서
+
+page를 할당하고 있다.
+
+ps. 이부분은 `pt-big-stk-obj` 테스트 뿐만 아니라 일반적인 stack-growth 테스트를 같이 확인해야 알 수 있는데
+
+`pt-big-stk-obj` 의 rsp는 1195835008으로 시작하고 `pt-grow-stack`의 rsp는 1195896448로 시작한다.
+
+즉, `pt-grow-stack`의 rsp - `pt-big-stk-obj`의 rsp = 61440 이다.
+
+시작점이 지역변수인 `stk_obj` char 배열의 크기만큼인것을 확인할 수 있다
+
+그렇다면 우리는 한가지 의문이 든다.
+
+rsp를 많이 밀어주었을때 while문을 돌면서 page를 할당해주는데
+
+while문의 종료구문인 `spt_find_page()`에 의해 종료가된다.
+
+이말인 즉슨, vitual page를 4kb씩 밀어주면서 할당하다가 이미 존재하는 page가 있을때 종료가 된다는것인데
+
+그렇다면 다른 virtual page를 만났을때 우리가 필요한 만큼의 stack growth가 됐다는걸 어떻게 보장한다는 것일까 ?
+
+결론부터 말하면 우리는 이런 case를 처리하기위해 지속적으로 한가지 규칙이 있었다
+
+그것중 하나는 4kb 1page당 4096바이트를 정렬시켜준 이유가 여기 있다.
+
+또한 rsp-8이 라는것은 1개의 **push** 인스트럭션을 위한 단위이기에 스택에 넣기위해 push를 할때 page fault가 발생하는것이다.
+
+ps. 여담이지만 pintos-kaist youtube 강의를 보면 rsp-32 즉, 32byte를 밀어주고 확인하는데
+
+이는 PUSHA 라는 인스트럭션이 32비트 운영체제에서는 존재하기 떄문이다
+
+PUSHA 명령어는 현제 레지스터에 있는 모든 값을 스택에 저장해두는데 (이를 호출하는 경우는 컨텍스트 스위치가 일어났을때 현재 레지스터의 모든 상태값을 저장해야할때)
+
+32비트 운영체제의 레지스터는 8개가 있고 1word는 4바이트 이므로 4 \* 8 = 32바이트가 된다.
+
+그렇다면 64비트 운영체제에서는 16개의 레지스터가 있기에 16 \* 8(1word == 8byte) = 128바이트가 되어야 하는데 어째서 8byte의 push만 확인할까 ?
+
+이는 64비트 운영체제에서는 PUSHA가 없어지고 필요한 레지스터만 push할 수 있도록 변경되었기에 rsp-8로 확인하는것이다.
+
+```
+------------------------------------------------
+|                pt-big-stk-obj                |
+------------------------------------------------
+
+  (pt-big-stk-obj) begin
++ ----- CATCH handle_fault !! -----
++ addr : 1195835000
++ f->rsp : 1195835008
++ USER_STACK : 1195900928
++ USER_STACK - STACK_LIMIT : 1194852352
++ --------------------------------
++
++ ------stack growth() START !-------
++ @param addr : 1195835000
++ @var pg_round_down(addr) : 1195831296
++  page_addr + PGSIZE : 1195835392
++  page_addr + PGSIZE : 1195839488
++  page_addr + PGSIZE : 1195843584
++  page_addr + PGSIZE : 1195847680
++  page_addr + PGSIZE : 1195851776
++  page_addr + PGSIZE : 1195855872
++  page_addr + PGSIZE : 1195859968
++  page_addr + PGSIZE : 1195864064
++  page_addr + PGSIZE : 1195868160
++  page_addr + PGSIZE : 1195872256
++  page_addr + PGSIZE : 1195876352
++  page_addr + PGSIZE : 1195880448
++  page_addr + PGSIZE : 1195884544
++  page_addr + PGSIZE : 1195888640
++  page_addr + PGSIZE : 1195892736
++  page_addr + PGSIZE : 1195896832
++ ------stack growth() DONE !-------
++
+  (pt-big-stk-obj) cksum: 3256410166
+  (pt-big-stk-obj) end
+
+------------------------------------------------
+|                pt-grow-stack                 |
+------------------------------------------------
+  Acceptable output:
+  (pt-grow-stack) begin
+  (pt-grow-stack) cksum: 3424492700
+  (pt-grow-stack) end
+Differences in `diff -u' format:
+  (pt-grow-stack) begin
++ ----- CATCH handle_fault !! -----
++ addr : 1195896440
++ f->rsp : 1195896448
++ USER_STACK : 1195900928
++ USER_STACK - STACK_LIMIT : 1194852352
++ --------------------------------
++
++ ------stack growth() START !-------
++ @param addr : 1195896440
++ @var pg_round_down(addr) : 1195892736
++  page_addr + PGSIZE : 1195896832
++ ------stack growth() DONE !-------
++
+  (pt-grow-stack) cksum: 3424492700
+  (pt-grow-stack) end
 ```

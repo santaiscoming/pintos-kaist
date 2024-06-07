@@ -163,10 +163,9 @@ void validate_adress(const void *addr) {
   if (addr == NULL) do_exit(-1);
   if (is_kernel_vaddr(addr)) do_exit(-1);
 
-    /* ----------------- until PROJECT.2-2 ----------------- 
-  if (pml4_get_page(curr_t->pml4, addr) == NULL) do_exit(-1); */
+  if (pml4_get_page(curr_t->pml4, addr) == NULL) do_exit(-1);
 
-    /* ----------------- added for PROJECT.3-1 ----------------- */
+    /* ----------------- added for PROJECT.3-3 ----------------- */
 
 #ifdef VM
   void *pg_start_ptr = pg_round_down(addr);
@@ -176,11 +175,21 @@ void validate_adress(const void *addr) {
   if (page == NULL) do_exit(-1);
 
 #else
+  /* ------------------ until PROJECT.2-2 ------------------ */
+
   if (!pml4_get_page(curr_t->pml4, addr)) do_exit(-1);
 
 #endif
-
   /* --------------------------------------------------------- */
+}
+
+void check_valid_buffer(void *buffer) {
+  struct page *page = NULL;
+  void *pg_start_ptr = pg_round_down(buffer);
+
+  page = spt_find_page(&thread_current()->spt, pg_start_ptr);
+
+  if (page != NULL && page->writable == false) do_exit(-1);
 }
 
 /**
@@ -333,6 +342,7 @@ int do_read(int fd, void *buffer, unsigned length) {
   size_t read_bytes = 0;
 
   validate_adress(buffer);
+  check_valid_buffer(buffer);
 
   if (fd < 0 || fd >= curr->next_fd || fd == STDOUT_FILENO) {
     return -1;
@@ -498,13 +508,9 @@ pid_t do_fork(const char *thread_name) {
   }
 
   sema_down(&child_thread->fork_sema);
-  if (child_thread->exit_status == TID_ERROR) {
-    return TID_ERROR;
-  }
+  if (child_thread->exit_status == TID_ERROR) return TID_ERROR;
 
   return child_pid;
-
-  // return process_fork(thread_name, NULL);
 }
 
 int do_exec(const char *cmd_line) {
@@ -522,4 +528,4 @@ int do_exec(const char *cmd_line) {
 
 int do_wait(pid_t pid) { return process_wait(pid); }
 
-/* ----------------------------------------------------- */
+/* --------------------------------------------------------- */

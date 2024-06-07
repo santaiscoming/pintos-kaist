@@ -199,8 +199,6 @@ static struct frame *vm_evict_frame(void) {
   return NULL;
 }
 
-/* */
-
 /**
  * @brief physical memory에서 page만큼의 공간을 할당하고 할당한 블럭의 ptr을 
  *        들고있는 frame을 반환한다.
@@ -234,7 +232,28 @@ static struct frame *vm_get_frame(void) {
 }
 
 /* Growing the stack. */
-static void vm_stack_growth(void *addr UNUSED) {}
+/**
+ * @brief page fault가 발생한 주소를 기준으로 stack을 확장한다.
+ * 
+ * @param addr fault address
+ * 
+ * @details ⭐️MY_README.md 참고
+*/
+static void vm_stack_growth(void *addr UNUSED) {
+  bool succ = true;
+  struct supplement_page_table *spt = &thread_current()->spt;
+  struct page *page = NULL;
+  void *page_addr = pg_round_down(addr);
+
+  while (spt_find_page(spt, page_addr) == NULL) {
+    succ = vm_alloc_page(VM_ANON, page_addr, true);
+    if (!succ) PANIC("BAAAAAM !!");
+
+    page_addr += PGSIZE;
+
+    if (addr >= page_addr) break;
+  }
+}
 
 /* Handle the fault on write_protected page */
 static bool vm_handle_wp(struct page *page UNUSED) {}
@@ -244,7 +263,7 @@ static bool vm_handle_wp(struct page *page UNUSED) {}
  * 
  * @param f interrupt frame
  * @param addr fault address
- * @param user bool ? user로부터 접근 : kernel로부터 접근
+ * @param user bool ? user로부터 접근 : kernel로부터 접근 ⭐️page fault는 kernel에서도 발생 가능하다.
  * @param write bool ? 쓰기 권한으로 접근 : 읽기 권한으로 접근
  * @param not_present bool ? not-present(non load P.M) page 접근 : Read-only page 접근
  * 
@@ -264,13 +283,26 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
   if (user && is_kernel_vaddr(addr)) return false;
 
   page = spt_find_page(spt, page_addr);
+
   if (!page) {
-    if (!not_present) return false;
+    if (!not_present) return false; /*  */
+
+    // clang-format off
+    if (addr < (void *)USER_STACK && 
+        addr >= (void *)(f->rsp - 8) &&
+        addr >= (void *)(USER_STACK - USER_STACK_LIMIT_SIZE) ||
+        addr > f->rsp) {
+      // clang-format on
+      vm_stack_growth(addr);
+      return true;
+    }
+
+    return false;
   } else {
-    /* page가 read-only인데 write하려고 하는 경우 */
+    /* page는 R/O인데 write 작업을 하려는 경우 */
     if (page->writable == false && write == true) return false;
 
-    return vm_do_claim_page(page);
+    return vm_claim_page(page_addr);
   }
 }
 

@@ -40,6 +40,13 @@ struct thread;
 
 #define VM_TYPE(type) ((type) & 7)
 
+/* ----------------- added for PROJECT.3-3 ----------------- */
+
+/* 1MB */
+#define USER_STACK_LIMIT_SIZE (1 << 20)
+
+/* --------------------------------------------------------- */
+
 /* The representation of "page".
  * This is kind of "parent class", which has four "child class"es, which are
  * uninit_page, file_page, anon_page, and page cache (project4).
