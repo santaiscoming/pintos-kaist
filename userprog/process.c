@@ -970,39 +970,46 @@ static bool install_page(void *upage, void *kpage, bool writable) {
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-/**
+/** 
+ * @brief load_segment() 로 조각낸 page의 file(아직 load되지않음)을 physical
+ *        memory에 올린다. 
  * 
-*/
-
-/** TODO: Load the segment from the file 
- *  TODO: This called when the first page fault occurs on address VA. 
- *  TODO: VA is available when calling this function. 
+ * @param page load할 kva(PA)를 알고있는 page
+ * @param aux load_segment() 에서 vm_alloc_page_with_initializer()로 넘겨준 aux
+ * 
+ * @see load_segment(), vm_alloc_page_with_initializer()
+ * 
+ * TODO: Load the segment from the file 
+ * TODO: This called when the first page fault occurs on address VA. 
+ * TODO: VA is available when calling this function. 
  * 
  *  >  file에서 segment를 load하세요.
  *  >  이 함수는 VA 주소에서 처음 page가 발생할 때 호출됩니다.
  *  >  이 함수를 호출할 때 VA를 사용할 수 있습니다. 
 */
 static bool lazy_load_segment(struct page *page, void *aux) {
+  struct file_segment_info *info = (struct file_segment_info *)aux;
   void *physical_addr = page->frame->kva;
   bool result = false;
 
-  struct file_segment_info *info = (struct file_segment_info *)aux;
   struct file *file = info->file;
   off_t offset = info->offset;
   uint32_t read_bytes = info->read_bytes;
   uint32_t zero_bytes = info->zero_bytes;
 
-  off_t page_read_bytes = file_read_at(file, physical_addr, read_bytes, offset);
+  /* file의 offset에서 read_bytes만큼 읽어서 physical_addr에 저장한다. */
+  off_t actually_read_bytes =
+      file_read_at(file, physical_addr, read_bytes, offset);
 
-  if ((uint32_t)page_read_bytes != read_bytes) {
+  /* file에서 실제 읽은 bytes와 읽어야할 bytes가 다르다면 throw */
+  if ((uint32_t)actually_read_bytes != read_bytes) {
     free(aux);
     goto done;
   }
 
-  memset(physical_addr + page_read_bytes, 0, zero_bytes);
+  /* page의 나머지 부분을 0으로 초기화한다. */
+  memset(physical_addr + actually_read_bytes, 0, zero_bytes);
   result = true;
-
-  return result;
 
 done:
   return result;
@@ -1036,8 +1043,7 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
      * 
      * >  이 페이지를 어떻게 채울지 계산하십시오.
      * >  FILE에서 PAGE_READ_BYTES 바이트를 읽을 것입니다.
-     * >  그리고 마지막 PAGE_ZERO_BYTES 바이트를 0으로 설정합니다.
-    */
+     * >  그리고 마지막 PAGE_ZERO_BYTES 바이트를 0으로 설정합니다. */
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
@@ -1045,7 +1051,7 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
     struct file_segment_info *aux = calloc(1, sizeof(struct file_segment_info));
     if (aux == NULL) return false;
 
-    aux->file = file;
+    aux->file = file_duplicate(file);
     aux->read_bytes = page_read_bytes;
     aux->zero_bytes = page_zero_bytes;
     aux->offset = ofs;
@@ -1063,7 +1069,17 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
-/* Create a PAGE of stack at the USER_STACK. Return true on success. */
+/**
+ * @brief pending page를 할당하고 해당 page를 USER_STACK에 매핑한다.(실제 physical 
+ *        memory에 올라간다. 단, USER_STACK은 va다.)
+ * 
+ * @note Create a PAGE of stack at the USER_STACK. Return true on success.
+ * 
+ *       >  USER_STACK에 PAGE(physical mem)를 생성한다. 성공하면 true를 반환한다.
+ * 
+ * @details 4kb 만큼 밀어주고 USER_STACK으로 다시 위를 가르킨다
+ *          즉, 처음은 anon page이다.
+*/
 static bool setup_stack(struct intr_frame *if_) {
   bool success = false;
   void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
@@ -1076,13 +1092,14 @@ static bool setup_stack(struct intr_frame *if_) {
    * >  성공하면 rsp를 적절하게 설정하십시오.
    * >  페이지가 stack임을 표시해야합니다.
    */
-  /* TODO: Your code goes here */
 
+  /* pending 상태의 page를 할당한다. */
   if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true)) {
     if_->rsp = USER_STACK;
     success = true;
   }
 
+  /* pending 상태의 page를 요구하고 physical memory에 mapping한다. */
   if (vm_claim_page(stack_bottom)) {
     success = true;
   }
