@@ -160,11 +160,27 @@ void syscall_handler(struct intr_frame *f UNUSED) {
 void validate_adress(const void *addr) {
   struct thread *curr_t = thread_current();
 
+  if (addr == NULL) do_exit(-1);
   if (is_kernel_vaddr(addr)) do_exit(-1);
 
-  if (addr == NULL || !is_user_vaddr(addr)) do_exit(-1);
+    /* ----------------- until PROJECT.2-2 ----------------- 
+  if (pml4_get_page(curr_t->pml4, addr) == NULL) do_exit(-1); */
 
-  if (pml4_get_page(curr_t->pml4, addr) == NULL) do_exit(-1);
+    /* ----------------- added for PROJECT.3-1 ----------------- */
+
+#ifdef VM
+  void *pg_start_ptr = pg_round_down(addr);
+  struct page *page = NULL;
+
+  page = spt_find_page(&curr_t->spt, pg_start_ptr);
+  if (page == NULL) do_exit(-1);
+
+#else
+  if (!pml4_get_page(curr_t->pml4, addr)) do_exit(-1);
+
+#endif
+
+  /* --------------------------------------------------------- */
 }
 
 /**

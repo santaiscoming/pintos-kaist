@@ -209,9 +209,12 @@ void *pml4_get_page(uint64_t *pml4, const void *uaddr) {
  * otherwise it is read-only.
  * Returns true if successful, false if memory allocation
  * failed. 
- * >  
-*/
-
+ * 
+ * >  UPAGE(사용자 가상 페이지)에서 KPAGE(커널 가상 주소)로 식별된 물리 프레임에 대한
+ * >  PML4(페이지 맵 레벨 4)에 mapping을 추가합니다. ❌UPAGE는 이미 매핑되어 있으면 안됩니다.
+ * >  KPAGE는 아마도 palloc_get_page()로 user pool에서 얻은 페이지여야 합니다.
+ * >  WRITABLE이 true이면 새 페이지는 읽기/쓰기이고, 그렇지 않으면 읽기 전용입니다.
+ * >  메모리 할당에 성공하면 true를 반환하고, 실패하면 false를 반환합니다. */
 bool pml4_set_page(uint64_t *pml4, void *upage, void *kpage, bool rw) {
   ASSERT(pg_ofs(upage) == 0);
   ASSERT(pg_ofs(kpage) == 0);
@@ -244,14 +247,20 @@ void pml4_clear_page(uint64_t *pml4, void *upage) {
 /* Returns true if the PTE for virtual page VPAGE in PML4 is dirty,
  * that is, if the page has been modified since the PTE was
  * installed.
- * Returns false if PML4 contains no PTE for VPAGE. */
+ * Returns false if PML4 contains no PTE for VPAGE.
+ * 
+ * >  PML4의 가상 페이지 VPAGE에 대한 PTE가 dirty인 경우 true를 반환합니다.
+ * >  즉, PTE가 installed 이후에 페이지가 수정되었는지 확인합니다.
+ * >  PML4에 VPAGE에 대한 PTE가 없으면 false를 반환합니다. */
 bool pml4_is_dirty(uint64_t *pml4, const void *vpage) {
   uint64_t *pte = pml4e_walk(pml4, (uint64_t)vpage, false);
   return pte != NULL && (*pte & PTE_D) != 0;
 }
 
 /* Set the dirty bit to DIRTY in the PTE for virtual page VPAGE
- * in PML4. */
+ * in PML4.
+ *
+ * >  PML4의 가상 페이지 VPAGE에 대한 PTE의 dirty 비트를 DIRTY로 설정합니다. */
 void pml4_set_dirty(uint64_t *pml4, const void *vpage, bool dirty) {
   uint64_t *pte = pml4e_walk(pml4, (uint64_t)vpage, false);
   if (pte) {
@@ -267,14 +276,20 @@ void pml4_set_dirty(uint64_t *pml4, const void *vpage, bool dirty) {
 /* Returns true if the PTE for virtual page VPAGE in PML4 has been
  * accessed recently, that is, between the time the PTE was
  * installed and the last time it was cleared.  Returns false if
- * PML4 contains no PTE for VPAGE. */
+ * PML4 contains no PTE for VPAGE. 
+ * 
+ * >  PML4의 가상 페이지 VPAGE에 대한 PTE가 최근에 액세스되었는지 확인합니다.
+ * >  즉, PTE가 설치된 시간과 마지막으로 지워진 시간 사이에 액세스되었는지 확인합니다.
+ * >  PML4에 VPAGE에 대한 PTE가 없으면 false를 반환합니다. */
 bool pml4_is_accessed(uint64_t *pml4, const void *vpage) {
   uint64_t *pte = pml4e_walk(pml4, (uint64_t)vpage, false);
   return pte != NULL && (*pte & PTE_A) != 0;
 }
 
 /* Sets the accessed bit to ACCESSED in the PTE for virtual page
-   VPAGE in PD. */
+ *  VPAGE in PD. 
+ *
+ * >  PML4의 가상 페이지 VPAGE에 대한 PTE의 accessed 비트를 ACCESSED로 설정합니다. */
 void pml4_set_accessed(uint64_t *pml4, const void *vpage, bool accessed) {
   uint64_t *pte = pml4e_walk(pml4, (uint64_t)vpage, false);
   if (pte) {
